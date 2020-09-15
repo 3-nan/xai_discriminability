@@ -5,7 +5,11 @@ from . import innvestigate
 
 
 def parse_xai_method(xai_method):
-    if xai_method == "LRPZ":
+    # Gradient methods
+    if xai_method == "Gradient":
+        analyzer = innvestigate.analyzer.Gradient
+    # LRP methods
+    elif xai_method == "LRPZ":
         analyzer = innvestigate.analyzer.LRPZ
     elif xai_method == 'LRPEpsilon':
         analyzer = innvestigate.analyzer.LRPEpsilon
