@@ -1,19 +1,61 @@
-import tensorflow.keras as keras
-from tensorflow.keras.datasets import cifar10
-import innvestigate
 import numpy as np
-import pandas as pd
-
 from sklearn.svm import LinearSVC
 
+from . import innvestigate
 
-def get_relevances_for_layer(input, model, layer, analyzer, neuron_selection):
+
+def parse_xai_method(xai_method):
+    if xai_method == "LRPZ":
+        analyzer = innvestigate.analyzer.LRPZ
+    elif xai_method == 'LRPEpsilon':
+        analyzer = innvestigate.analyzer.LRPEpsilon
+    elif xai_method == 'LRPWSquare':
+        analyzer = innvestigate.analyzer.LRPWSquare
+    elif xai_method == 'LRPAlpha2Beta1':
+        analyzer = innvestigate.analyzer.LRPAlpha2Beta1
+    elif xai_method == 'LRPSequentialPresetA':
+        analyzer = innvestigate.analyzer.LRPSequentialPresetA
+    elif xai_method == 'LRPSequentialPresetB':
+        analyzer = innvestigate.analyzer.LRPSequentialPresetB
+    elif xai_method == 'LRPSequentialCompositeA':
+        analyzer = innvestigate.analyzer.LRPSequentialCompositeA
+    elif xai_method == 'LRPSequentialCompositeB':
+        analyzer = innvestigate.analyzer.LRPSequentialCompositeB
+    # innvestigate.analyzer.LRPGamma
+    else:
+        print("analyzer name " + xai_method + " not correct")
+        analyzer = None
+    return analyzer
+
+
+def get_predicted_labels(model, data):
+    """ Helper function to compute the predicted labels of the model. """
+    y_pred = []
+
+    for batch_data in data.as_numpy_iterator():
+        pred = model.predict(batch_data[0])
+        y_pred.append(pred)
+
+    y_pred = np.concatenate(y_pred)
+    y_pred = np.argmax(y_pred, axis=1)
+
+    return y_pred
+
+def get_relevances_for_layer(input_data, model, layer, xai_method, neuron_selection):
     """ Compute relevance maps for a given model and a specific layer."""
 
     # remove softmax from model
+    analyzer = parse_xai_method(xai_method)
 
     ana = analyzer(model)
-    R = ana.analyze(input, neuron_selection=neuron_selection, layer_names=[layer])
+
+    R = []
+
+    for batch_data in input_data.as_numpy_iterator():
+        R_batch = ana.analyze(batch_data[0], neuron_selection=neuron_selection, layer_names=[layer])
+        R.append(np.array(R_batch)[0])
+
+    R = np.concatenate(R)
 
     return R
 
@@ -22,6 +64,14 @@ def compute_separability(R_train, y_train, R_test, y_test):
     """ Computes the separability score for given relevance maps. """
     # reshape / flatten relevance maps
 
+    if len(y_train.shape) == 2:
+        y_train = np.argmax(y_train, axis=1)
+        y_test = np.argmax(y_test, axis=1)
+
+    if len(R_train.shape) == 4:
+        R_train = R_train.reshape(R_train.shape[0], R_train.shape[1]*R_train.shape[2]*R_train.shape[3])
+        R_test = R_test.reshape(R_test.shape[0], R_test.shape[1] * R_test.shape[2] * R_test.shape[3])
+
     clf = LinearSVC(max_iter=500)
     clf.fit(R_train, y_train)
     result = clf.score(R_test, y_test)
@@ -29,30 +79,30 @@ def compute_separability(R_train, y_train, R_test, y_test):
     return result
 
 
-def evaluate_model_separability(model, dataset):
+def evaluate_model_separability(model, train_data, test_data, xai_method, layer):
     """ Compute relevance map separability for each layer of the given model and dataset. """
 
     # load dataset
+    y_train = np.concatenate([ys for imgs, ys in train_data], axis=0)
+    y_test = np.concatenate([ys for imgs, ys in test_data], axis=0)
 
-    for layer in model.layers:
-        # original labels / predicted labels / random labels / all labels
+    neuron_selection = "max_activation"
 
-        R_train = get_relevances_for_layer(x_train, model, layer, analyzer, neuron_selection)
+    # get predicted labels
+    y_train_pred = get_predicted_labels(model, train_data)
+    y_test_pred = get_predicted_labels(model, test_data)
 
+    # prepare model
+    model = innvestigate.utils.keras.graph.model_wo_softmax(model)
 
-analyzer_cases = [
-    innvestigate.analyzer.ReverseAnalyzerBase,
-    innvestigate.analyzer.LRPZ,
-    innvestigate.analyzer.LRPEpsilon,
-    innvestigate.analyzer.LRPWSquare,
-    innvestigate.analyzer.LRPAlpha2Beta1,
-    innvestigate.analyzer.LRPAlpha1Beta0,
-    innvestigate.analyzer.LRPSequentialPresetA,
-    innvestigate.analyzer.LRPSequentialPresetB,
-    # innvestigate.analyzer.LRPGamma
-]
+    R_train = get_relevances_for_layer(train_data, model, layer, xai_method, neuron_selection)
+    R_test = get_relevances_for_layer(test_data, model, layer, xai_method, neuron_selection)
 
+    result = compute_separability(R_train, y_train_pred, R_test, y_test_pred)
 
+    return result
+
+'''
 def compute_relevances(setup, predicted=True):
     # data
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
@@ -253,4 +303,4 @@ for setup in setups:
                                         'psvm_on_predicted_test_score_on_actual',
                                         'psvm_masked_train_score', 'psvm_masked_test_score'])
     df.to_csv('results_cifar10_' + 'LeNet5' + '_linearsvm_smoothgrad_v3' + '.csv', index=False)
-
+'''

@@ -1,6 +1,6 @@
 import tensorflow.keras as keras
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Activation, Conv2D, Dense, Dropout, Flatten, MaxPool2D
+from tensorflow.keras.layers import Activation, Conv2D, Dense, Dropout, Flatten, MaxPool2D, InputLayer
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -11,7 +11,7 @@ from tensorflow.python.client import device_lib
 
 print(device_lib.list_local_devices())
 
-epochs = 100
+epochs = 70
 batch_size = 250
 
 # data
@@ -27,25 +27,46 @@ y_test = keras.utils.to_categorical(y_test, 10)
 # T_val = pd.get_dummies(Y_val).to_numpy()
 
 model = Sequential()
-model.add(Conv2D(32, (3, 3), padding='same',
-                 input_shape=x_train.shape[1:]))
-model.add(Activation('relu'))
-model.add(Conv2D(32, (3, 3)))
-model.add(Activation('relu'))
-model.add(MaxPool2D(pool_size=(2, 2)))
+
+model.add(InputLayer(input_shape=x_train.shape[1:]))
+# Block 1
+model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2), strides=(2,2)))
 model.add(Dropout(0.25))
 
-model.add(Conv2D(64, (3, 3), padding='same'))
-model.add(Activation('relu'))
-model.add(Conv2D(64, (3, 3)))
-model.add(Activation('relu'))
-model.add(MaxPool2D(pool_size=(2, 2)))
+# Block 2
+model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(128, (3, 3), padding='same', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2), strides=(2,2)))
 model.add(Dropout(0.25))
 
+# Block 3
+model.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(256, (3, 3), padding='same', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2), strides=(2,2)))
+model.add(Dropout(0.25))
+
+# Block 4
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2), strides=(2,2)))
+model.add(Dropout(0.25))
+
+# Block 5
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(Conv2D(512, (3, 3), padding='same', activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2), strides=(2,2)))
+model.add(Dropout(0.25))
+
+# Classification Block
 model.add(Flatten())
-model.add(Dense(512))
-model.add(Activation('relu'))
+model.add(Dense(4096, activation='relu'))
 model.add(Dropout(0.5))
+model.add(Dense(4096, activation='relu'))
 model.add(Dense(10))
 model.add(Activation('softmax'))
 
@@ -73,12 +94,8 @@ model.fit(x_train, y_train,
 score = model.evaluate(x_train, y_train, batch_size=32)
 print(score)
 
-#x_test = x_test / 127.5 - 1
-
-# x_test = x_test.reshape((x_test.shape[0], 28, 28, 1))
-# test_score = model.evaluate(x_test, pd.get_dummies(y_test), batch_size=32)
 test_score = model.evaluate(x_test, y_test, batch_size=32)
 print(test_score)
 
-model.save('../../models/lenet_cifar10/model_old.h5')
+model.save('../../models/vgg16_cifar10/model')
 

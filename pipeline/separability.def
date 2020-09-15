@@ -1,0 +1,22 @@
+Bootstrap: docker
+From: tensorflow/tensorflow:latest-gpu
+
+%files
+  ./separability /opt/separability
+
+%post
+  apt -y update 
+  #apt -y install python3
+  #apt -y install python3-pip
+  #export PATH="/opt/conda/bin:$PATH"
+  pip3 install --upgrade pip
+  #pip3 install tensorflow==2.3
+  pip3 install glob3 termcolor pyyaml
+  pip3 install pandas
+  pip3 install scikit-learn
+ 
+%runscript
+  cd /opt
+
+  python3 -m separability "$@"
+ 

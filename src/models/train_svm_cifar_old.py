@@ -7,52 +7,6 @@ import pandas as pd
 from sklearn.svm import LinearSVC
 
 
-def get_relevances_for_layer(input, model, layer, analyzer, neuron_selection):
-    """ Compute relevance maps for a given model and a specific layer."""
-
-    # remove softmax from model
-
-    ana = analyzer(model)
-    R = ana.analyze(input, neuron_selection=neuron_selection, layer_names=[layer])
-
-    return R
-
-
-def compute_separability(R_train, y_train, R_test, y_test):
-    """ Computes the separability score for given relevance maps. """
-    # reshape / flatten relevance maps
-
-    clf = LinearSVC(max_iter=500)
-    clf.fit(R_train, y_train)
-    result = clf.score(R_test, y_test)
-
-    return result
-
-
-def evaluate_model_separability(model, dataset):
-    """ Compute relevance map separability for each layer of the given model and dataset. """
-
-    # load dataset
-
-    for layer in model.layers:
-        # original labels / predicted labels / random labels / all labels
-
-        R_train = get_relevances_for_layer(x_train, model, layer, analyzer, neuron_selection)
-
-
-analyzer_cases = [
-    innvestigate.analyzer.ReverseAnalyzerBase,
-    innvestigate.analyzer.LRPZ,
-    innvestigate.analyzer.LRPEpsilon,
-    innvestigate.analyzer.LRPWSquare,
-    innvestigate.analyzer.LRPAlpha2Beta1,
-    innvestigate.analyzer.LRPAlpha1Beta0,
-    innvestigate.analyzer.LRPSequentialPresetA,
-    innvestigate.analyzer.LRPSequentialPresetB,
-    # innvestigate.analyzer.LRPGamma
-]
-
-
 def compute_relevances(setup, predicted=True):
     # data
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
@@ -70,7 +24,7 @@ def compute_relevances(setup, predicted=True):
     x_train = x_train / 127.5 - 1
     x_test = x_test / 127.5 - 1
 
-    model = keras.models.load_model('../../models/lenet_cifar10/model.h5')
+    model = keras.models.load_model('../../models/lenet_cifar10/model_old.h5')
 
     print(model.metrics_names)
     train_score = model.evaluate(x_train, y_train_categorical, batch_size=64)[1]
@@ -84,11 +38,11 @@ def compute_relevances(setup, predicted=True):
 
     print(setup)
     if predicted:
-        #analyzer = innvestigate.create_analyzer(setup, model)
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1(model)
+        analyzer = innvestigate.create_analyzer(setup, model)
+        #analyzer = innvestigate.analyzer.LRPAlpha2Beta1_new(model)
     else:
-        #analyzer = innvestigate.create_analyzer(setup, model, neuron_selection_mode="index")
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1(model)
+        analyzer = innvestigate.create_analyzer(setup, model, neuron_selection_mode="index")
+        #analyzer = innvestigate.analyzer.LRPAlpha2Beta1_new(model)
 
     batchsize = 1000 #125  # 1000
     r_train = []
@@ -100,13 +54,13 @@ def compute_relevances(setup, predicted=True):
             r_batch = analyzer.analyze(x_train[i*batchsize:(i+1)*batchsize, :, :, :])
         else:
             r_batch = analyzer.analyze(x_train[i * batchsize:(i + 1) * batchsize, :, :, :],
-                                       neuron_selection=list(y_train[i * batchsize:(i + 1) * batchsize]))
+                                       neuron_selection=list(y_train[i * batchsize:(i + 1) * batchsize] ))
 
         r_train.append(r_batch)
         masked_train.append(r_batch*x_train[i*batchsize:(i+1)*batchsize, :, :, :])
 
-    r_train = np.concatenate(r_train, axis=1)
-    masked_train = np.concatenate(masked_train, axis=1)
+    r_train = np.concatenate(r_train)
+    masked_train = np.concatenate(masked_train)
     print(r_train.shape)
 
     # test relevances
@@ -120,28 +74,28 @@ def compute_relevances(setup, predicted=True):
 
         r_test.append(r_batch)
 
-    r_test = np.concatenate(r_test, axis=1)
+    r_test = np.concatenate(r_test)
 
-    r_train = r_train.reshape((r_train.shape[1], 1024*3))
-    masked_train = masked_train.reshape((masked_train.shape[1], 1024*3))
-    masked_test = (r_test * x_test).reshape((r_test.shape[1], 1024*3))
+    r_train = r_train.reshape((r_train.shape[0], 1024*3))
+    masked_train = masked_train.reshape((masked_train.shape[0], 1024*3))
+    masked_test = (r_test * x_test).reshape((r_test.shape[0], 1024*3))
 
     # save data
     if predicted:
-        np.save('../../tmp/r_train_predicted.npy', r_train)
-        np.save('../../tmp/r_test_predicted.npy', r_test)
-        np.save('../../tmp/masked_train_predicted.npy', masked_train)
-        np.save('../../tmp/masked_test_predicted.npy', masked_test)
+        np.save('tmp/r_train_predicted.npy', r_train)
+        np.save('tmp/r_test_predicted.npy', r_test)
+        np.save('tmp/masked_train_predicted.npy', masked_train)
+        np.save('tmp/masked_test_predicted.npy', masked_test)
     else:
-        np.save('../../tmp/r_train_true.npy', r_train)
-        np.save('../../tmp/r_test_true.npy', r_test)
-        np.save('../../tmp/masked_train_true.npy', masked_train)
-        np.save('../../tmp/masked_test_true.npy', masked_test)
+        np.save('tmp/r_train_true.npy', r_train)
+        np.save('tmp/r_test_true.npy', r_test)
+        np.save('tmp/masked_train_true.npy', masked_train)
+        np.save('tmp/masked_test_true.npy', masked_test)
 
-    np.save('../../tmp/y_train.npy', y_train)
-    np.save('../../tmp/y_test.npy', y_test)
-    np.save('../../tmp/predicted_y_train.npy', predicted_y_train)
-    np.save('../../tmp/predicted_y_test.npy', predicted_y_test)
+    np.save('tmp/y_train.npy', y_train)
+    np.save('tmp/y_test.npy', y_test)
+    np.save('tmp/predicted_y_train.npy', predicted_y_train)
+    np.save('tmp/predicted_y_test.npy', predicted_y_test)
 
     return train_score, test_score
     
@@ -149,34 +103,34 @@ def compute_relevances(setup, predicted=True):
 def svms_on_relevances(predicted=True):
 
     if predicted:
-        r_train = np.load('../../tmp/r_train_predicted.npy')
-        r_test = np.load('../../tmp/r_test_predicted.npy')
-        masked_train = np.load('../../tmp/masked_train_predicted.npy')
-        masked_test = np.load('../../tmp/masked_test_predicted.npy')
+        r_train = np.load('tmp/r_train_predicted.npy')
+        r_test = np.load('tmp/r_test_predicted.npy')
+        masked_train = np.load('tmp/masked_train_predicted.npy')
+        masked_test = np.load('tmp/masked_test_predicted.npy')
 
     else:
-        r_train = np.load('../../tmp/r_train_true.npy')
-        r_test = np.load('../../tmp/r_test_true.npy')
-        masked_train = np.load('../../tmp/masked_train_true.npy')
-        masked_test = np.load('../../tmp/masked_test_true.npy')
+        r_train = np.load('tmp/r_train_true.npy')
+        r_test = np.load('tmp/r_test_true.npy')
+        masked_train = np.load('tmp/masked_train_true.npy')
+        masked_test = np.load('tmp/masked_test_true.npy')
 
-    y_train = np.load('../../tmp/y_train.npy')
-    y_test = np.load('../../tmp/y_test.npy')
-    predicted_y_train = np.load('../../tmp/predicted_y_train.npy')
-    predicted_y_test = np.load('../../tmp/predicted_y_test.npy')
+    y_train = np.load('tmp/y_train.npy')
+    y_test = np.load('tmp/y_test.npy')
+    predicted_y_train = np.load('tmp/predicted_y_train.npy')
+    predicted_y_test = np.load('tmp/predicted_y_test.npy')
 
     # train svm with rtrain
     print('train relevance svm')
     print(y_train)
     print(y_train.shape)
 
-    clf = LinearSVC(max_iter=200)
+    clf = LinearSVC()
     clf.fit(r_train, y_train)
 
     svm_train_score = clf.score(r_train, y_train)
     print(svm_train_score)
 
-    r_test = r_test.reshape((r_test.shape[1], 1024*3))
+    r_test = r_test.reshape((r_test.shape[0], 1024*3))
 
     svm_test_score = clf.score(r_test, y_test)
     svm_on_actual_test_score_on_predicted = clf.score(r_test, predicted_y_test)
@@ -184,7 +138,7 @@ def svms_on_relevances(predicted=True):
 
     # train svm with rtrain on predicted class labels
     print('train relevance svm on predicted class labels')
-    clf = LinearSVC(max_iter=200)
+    clf = LinearSVC()
     clf.fit(r_train, predicted_y_train)
 
     svm_on_predicted_train_score = clf.score(r_train, predicted_y_train)
@@ -196,7 +150,7 @@ def svms_on_relevances(predicted=True):
     # train svm on masked cifar10
     print('train relevance-masked data svm')
 
-    clf = LinearSVC(max_iter=200)
+    clf = LinearSVC()
     clf.fit(masked_train, y_train)
 
     svm_masked_train_score = clf.score(masked_train, y_train)
@@ -211,7 +165,8 @@ def svms_on_relevances(predicted=True):
 
 results = []
 
-setups = ['test']
+setups = ['smoothgrad',
+          'lrp.z']
         #'gradient', 'smoothgrad', 'lrp.z',
          # 'lrp.epsilon',
           #'lrp.w_square',
