@@ -12,6 +12,7 @@ def load_imagenet():
 		label_mode="categorical",
 		image_size=(224, 224),
 		batch_size=64,
+		shuffle=True,
 	)
 
 	test_data = tf.keras.preprocessing.image_dataset_from_directory(
@@ -47,11 +48,13 @@ def load_cifar10():
 				)
 
 	# preprocess data
-	normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1. / 127.5, offset=-1)
+	#normalization_layer = tf.keras.layers.experimental.preprocessing.Rescaling(1. / 127.5, offset=-1)
 
-	train_data = train_data.map(lambda x, y: (normalization_layer(x), y))
-	test_data = test_data.map(lambda x, y: (normalization_layer(x), y))
-	
+	#train_data = train_data.map(lambda x, y: (normalization_layer(x), y))
+	#test_data = test_data.map(lambda x, y: (normalization_layer(x), y))
+	train_data = train_data.map(lambda x, y: ((x / 127.5 - 1), y))
+	test_data = test_data.map(lambda x, y: ((x / 127.5 - 1), y))
+
 	return train_data, test_data
 
 

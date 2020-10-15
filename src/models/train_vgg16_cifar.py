@@ -81,8 +81,8 @@ model.compile(loss='categorical_crossentropy',
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
 # Normalize inputs
-x_train = x_train / 127.5 - 1
-x_test = x_test / 127.5 - 1
+x_train = x_train * 2. - 1
+x_test = x_test * 2. - 1
 
 # Fit the model
 model.fit(x_train, y_train,

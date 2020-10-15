@@ -1,0 +1,1 @@
+-d ./data/  -dn cifar10 -o ./output/ -m /data/cluster/users/motzkus/models/vgg16_cifar10/model/ -mn vgg16

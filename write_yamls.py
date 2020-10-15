@@ -1,7 +1,7 @@
 import yaml
 import tensorflow.keras as keras
 
-model = keras.models.load_model('models/vgg16_cifar10/model')
+model = keras.models.load_model('train_models/train_vgg16_cifar10/model')
 
 layers = []
 
@@ -14,7 +14,7 @@ for layername in layers:
         'dataset': 'cifar10',
         'model_path': '/mnt/additional_files/model/',
         'model_name': 'cifar10_vgg16',
-        'xai_method': 'LRPSequentialCompositeA',
+        'xai_method': 'LRPAlpha1Beta0',
         'layer': layername
     }
 

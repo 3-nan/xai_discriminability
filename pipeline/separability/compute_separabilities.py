@@ -78,6 +78,7 @@ def compute_separability(R_train, y_train, R_test, y_test):
 
     clf = LinearSVC(max_iter=500)
     clf.fit(R_train, y_train)
+    print(clf.score(R_train, y_train))
     result = clf.score(R_test, y_test)
 
     return result
