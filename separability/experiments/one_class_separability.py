@@ -35,73 +35,73 @@ ARGS = parser.parse_args()
 #####################
 
 
-def load_relevance_maps(data_path, start_index, end_index):
-    """ Load npy files of relevance maps"""
-    rmaps = []
-    labels = []
-
-    for dir in os.scandir(data_path + "/train"):
-        # collect files and sort
-        data_files = os.listdir(dir.path)
-        data_files.sort(key=lambda f: int(f.split("_", 1)[0]))
-
-        for file in data_files[:5]:
-            load_maps = np.load(dir.path + "/" + file)
-            rmaps.append(load_maps)
-            labels.append(np.ones(load_maps.shape[0], dtype=np.int)*int(dir.name))
-
-    rmaps = np.concatenate(rmaps)
-    labels = np.concatenate(labels)
-
-    # shuffle data
-    p = np.random.permutation(len(labels))
-
-    print(rmaps.shape)
-    print(labels.shape)
-
-    return rmaps[p], labels[p]
-
-
-def load_relevance_map_selection(data_path, partition):
+def load_relevance_map_selection(data_path, label, indices):
     """ Load a selection of relevance maps
-    partition: str - either train or test
+    label: int - class label to get data for
     """
     rmaps = []
     labels = []
 
-    for dir in os.scandir(data_path + "/" + partition):
-        # collect files and sort
+    for dir in os.scandir(data_path + "/" + 'train'):
+
+        # load data from indices
         data_files = os.listdir(dir.path)
-        data_files.sort(key=lambda f: int(f.split("-", 1)[0]))
+        data_files.sort(key=lambda f: int(f.split("_", 1)[0]))
+
+        R_c = []
+        for file in data_files:
+            R_c.append(np.load(dir.path + "/" + file))
+
+        R_c = np.concatenate(R_c)
+
+        rmaps.append(R_c[indices])
+
+        # get number of entries per data file
+        # size = int(data_files[0].split("_", 1)[1].split(".")[0]) * 5
+
+        if dir.name == str(label):
+            # append true to labels
+            labels.append(np.ones(np.sum(indices)))
+        else:
+            # append false to labels
+            labels.append(np.zeros(np.sum(indices)))
+
+    rmaps = np.concatenate(rmaps)
+    labels = np.concatenate(labels)
+
+    print(rmaps.shape)
+    print(labels.shape)
+
+    # shuffle files
+    p = np.random.permutation(len(labels))
+
+    return rmaps[p], labels[p]
 
 
 # load data
 data_path = ARGS.data_path + "/" + ARGS.data_name + "/" + ARGS.model_name + "/" + ARGS.layer + "/" + ARGS.rule
 
-relevance_maps, labels = load_relevance_maps(data_path, 0, 10000)
+(_, y_train), (_, _) = tf.keras.datasets.cifar10.load_data()
+# get selection of data and relevance maps
+for c in range(10):
 
-if len(relevance_maps.shape) == 4:
-    relevance_maps = np.reshape(relevance_maps, (relevance_maps.shape[0], relevance_maps.shape[1]*relevance_maps.shape[2]*relevance_maps.shape[3]))
+    print("estimate one class separability for class " + str(c))
 
-print("start training linear classifier now")
-start = time.process_time()
+    indices = (y_train == c).flatten()
+    Rc_data, labels = load_relevance_map_selection(data_path, c, indices)
 
-clf = LinearSVC()
+    if len(Rc_data.shape) == 4:
+        Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
 
-clf.fit(relevance_maps, labels)
+    clf = LinearSVC()
+    clf.fit(Rc_data[:40000], labels[:40000])
 
-score = clf.score(relevance_maps, labels)
+    score = clf.score(Rc_data[40000:], labels[40000:])
 
-print("Duration of training of linear clf:")
-print(time.process_time() - start)
+    print("separability score for class " + str(c))
+    print(score)
 
-# output
-output_dir = ARGS.output_dir
-
-print("separability score")
-print(score)
-
-df = pd.DataFrame([[ARGS.data_name, ARGS.model_name, ARGS.layer, ARGS.rule, str(score)]],
-                  columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
-df.to_csv(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "_" + ARGS.layer + "_" + ARGS.rule + ".csv",
-          index=False)
+    df = pd.DataFrame([[ARGS.data_name, ARGS.model_name, ARGS.layer, ARGS.rule, str(score)]],
+                      columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
+    df.to_csv(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "_" + ARGS.layer + "_" + ARGS.rule + "_"
+              + str(c) + ".csv", index=False)

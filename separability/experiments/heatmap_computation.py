@@ -19,6 +19,8 @@ def parse_xai_method(xai_method):
         analyzer = innvestigate.analyzer.LRPEpsilon
     elif xai_method == 'LRPWSquare':
         analyzer = innvestigate.analyzer.LRPWSquare
+    elif xai_method == 'LRPGamma':
+        analyzer = innvestigate.analyzer.LRPGamma
     elif xai_method == 'LRPAlpha1Beta0':
         analyzer = innvestigate.analyzer.LRPAlpha1Beta0
     elif xai_method == 'LRPAlpha2Beta1':
@@ -77,7 +79,10 @@ x_train = x_train / 127.5 - 1
 x_test = x_test / 127.5 - 1
 
 # get data selection
-x_data = x_train[ARGS.start_index:ARGS.end_index]
+if ARGS.partition == "train":
+    x_data = x_train[ARGS.start_index:ARGS.end_index]
+elif ARGS.partition == "test":
+    x_data = x_test[ARGS.start_index:ARGS.end_index]
 
 # prepare model
 model_path = ARGS.model_path
