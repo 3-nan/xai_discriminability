@@ -3,8 +3,8 @@ import pandas as pd
 
 data_path = 'results/one_class/'
 
-methods = ['Gradient', 'LRPZ', 'LRPAlpha1Beta0', 'LRPGamma', 'LRPSequentialCompositeA', 'LRPSequentialCompositeBFlat']
-layers = ['conv2d', 'conv2d_2', 'conv2d_4', 'conv2d_7', 'conv2d_10', 'dense', 'dense_1', 'dense_2']
+methods = ['Gradient', 'SmoothGrad', 'LRPZ', 'LRPAlpha1Beta0', 'LRPGamma', 'LRPSequentialCompositeA', 'LRPSequentialCompositeBFlat']
+layers = ['conv2d', 'conv2d_1', 'conv2d_2', 'conv2d_4', 'conv2d_7', 'conv2d_10', 'dense', 'dense_1', 'dense_2']
 
 files = []
 

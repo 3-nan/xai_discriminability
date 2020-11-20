@@ -6,12 +6,15 @@ import numpy as np
 import tensorflow as tf
 
 import innvestigate
+from data_provider import DataProvider
 
 
 def parse_xai_method(xai_method):
     # Gradient methods
     if xai_method == "Gradient":
         analyzer = innvestigate.analyzer.Gradient
+    elif xai_method == "SmoothGrad":
+        analyzer = innvestigate.analyzer.SmoothGrad
     # LRP methods
     elif xai_method == "LRPZ":
         analyzer = innvestigate.analyzer.LRPZ
@@ -68,21 +71,24 @@ ARGS = parser.parse_args()
 #####################
 
 # load data
-if ARGS.data_path:
-    print(ARGS.data_path)
-else:
-    print("load data from " + ARGS.data_name)
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+# if ARGS.data_path:
+#     print(ARGS.data_path)
+# else:
+#     print("load data from " + ARGS.data_name)
+#     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+
+data_provider = DataProvider(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
+data = data_provider.get_data_partition(ARGS.partition, ARGS.start_index, ARGS.end_index)
 
 # preprocess data
-x_train = x_train / 127.5 - 1
-x_test = x_test / 127.5 - 1
+# x_train = x_train / 127.5 - 1
+# x_test = x_test / 127.5 - 1
 
 # get data selection
-if ARGS.partition == "train":
-    x_data = x_train[ARGS.start_index:ARGS.end_index]
-elif ARGS.partition == "test":
-    x_data = x_test[ARGS.start_index:ARGS.end_index]
+# if ARGS.partition == "train":
+#     x_data = x_train[ARGS.start_index:ARGS.end_index]
+# elif ARGS.partition == "test":
+#     x_data = x_test[ARGS.start_index:ARGS.end_index]
 
 # prepare model
 model_path = ARGS.model_path
@@ -109,10 +115,11 @@ R = []
 layer = ARGS.layer
 neuron_selection = ARGS.class_label # np.ones(ARGS.batch_size) * ARGS.class_label    # "index"
 
-for batch in range(int(x_data.shape[0]/ARGS.batch_size)):
-    R_batch = ana.analyze(x_data[batch*ARGS.batch_size:(batch+1)*ARGS.batch_size],
+for batch in data:
+    R_batch = ana.analyze(batch[0].numpy(),
                           neuron_selection=neuron_selection,
                           explained_layer_names=[layer])
+
     R.append(np.array(R_batch[layer]))
 
 R = np.concatenate(R)

@@ -1,25 +1,32 @@
 import os
+from separability.experiments.data_provider import DataProvider
 
-rule = "LRPSequentialCompositeA"
-layers = ['conv2d', 'conv2d_1', 'conv2d_2', 'conv2d_4', 'conv2d_7', 'conv2d_10', 'dense', 'dense_1', 'dense_2']
+rule = "LRPCompositeSequentialBFlat"
+# layers = ['conv2d', 'conv2d_1', 'conv2d_2', 'conv2d_4', 'conv2d_7', 'conv2d_10', 'dense', 'dense_1', 'dense_2']
+layers = ['input_1', 'block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1', 'fc1', 'fc2']
+
+dp = DataProvider("../../data/imagenet/", 50)
+dataset = dp.get_data("val")
+print(dataset.cardinality().numpy())
 
 job_size = 1000     # number of images to process per job
 argument_list = []
 
 for layer in layers:
 
-    for c in range(10):
+    for c in [96, 292, 301, 347, 387, 417, 604, 890, 937, 954]: # range(10):
         base_args = ""
 
-        base_args += "-dn cifar10"
+        base_args += "-d /data/cluster/users/motzkus/data/imagenet/"
+        base_args += " -dn imagenet"
         base_args += " -o /data/cluster/users/motzkus/relevance_maps"
-        base_args += " -m /data/cluster/users/motzkus/models/vgg16_cifar10/model/"
+        base_args += " -m /data/cluster/users/motzkus/models/vgg16_imagenet/model/"
         base_args += " -mn vgg16"
 
-        for i in range(int(10000/job_size)):
+        for i in range(int(20*50/job_size)):        # 50000/job_size)):
 
             args = base_args + " -si " + str(i*job_size) + " -ei " + str((i+1)*job_size)
-            args += " -p test"
+            args += " -p val"
             args = args + " -cl " + str(c)
             args = args + " -r " + rule
             args = args + " -l " + layer

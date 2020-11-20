@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import time
 import os
 import numpy as np
 import pandas as pd
@@ -35,14 +34,14 @@ ARGS = parser.parse_args()
 #####################
 
 
-def load_relevance_map_selection(data_path, label, indices):
+def load_relevance_map_selection(data_path, partition, label, indices):
     """ Load a selection of relevance maps
     label: int - class label to get data for
     """
     rmaps = []
     labels = []
 
-    for dir in os.scandir(data_path + "/" + 'train'):
+    for dir in os.scandir(data_path + "/" + partition):
 
         # load data from indices
         data_files = os.listdir(dir.path)
@@ -81,22 +80,31 @@ def load_relevance_map_selection(data_path, label, indices):
 # load data
 data_path = ARGS.data_path + "/" + ARGS.data_name + "/" + ARGS.model_name + "/" + ARGS.layer + "/" + ARGS.rule
 
-(_, y_train), (_, _) = tf.keras.datasets.cifar10.load_data()
+(_, y_train), (_, y_test) = tf.keras.datasets.cifar10.load_data()
 # get selection of data and relevance maps
 for c in range(10):
 
     print("estimate one class separability for class " + str(c))
 
     indices = (y_train == c).flatten()
-    Rc_data, labels = load_relevance_map_selection(data_path, c, indices)
+    # load train data
+    Rc_data, labels = load_relevance_map_selection(data_path, 'train', c, indices)
 
     if len(Rc_data.shape) == 4:
         Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
 
     clf = LinearSVC()
-    clf.fit(Rc_data[:40000], labels[:40000])
+    clf.fit(Rc_data, labels)
 
-    score = clf.score(Rc_data[40000:], labels[40000:])
+    # load test data
+    test_indices = (y_test == c).flatten()
+    Rc_test, test_labels = load_relevance_map_selection(data_path, 'test', c, test_indices)
+
+    if len(Rc_test.shape) == 4:
+        Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
+
+    # compute score
+    score = clf.score(Rc_test, test_labels)
 
     print("separability score for class " + str(c))
     print(score)
