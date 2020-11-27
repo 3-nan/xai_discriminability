@@ -1,35 +1,20 @@
 # Get Python six functionality:
 from __future__ import\
     absolute_import, print_function, division, unicode_literals
-from builtins import zip
-
 
 ###############################################################################
 ###############################################################################
 ###############################################################################
 
 
-import tensorflow.keras.layers as keras_layers
-import tensorflow.keras.models as keras_models
-import tensorflow.keras.backend as K
 import numpy as np
 
-import tensorflow as tf
-from tensorflow.python.distribute import distribution_strategy_context
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras import backend
-from tensorflow.python.keras.distribute import distributed_training_utils
 from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.keras.engine import node as node_module
 from tensorflow.python.keras.saving.saved_model import layer_serialization
-from tensorflow.python.keras.utils import tf_utils
-from tensorflow.python.util.tf_export import keras_export
 
 from . import base
-from .. import layers as ilayers
-from .. import utils as iutils
-from ..utils import keras as kutils
-
 
 __all__ = [
     "WrapperBase",

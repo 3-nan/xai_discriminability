@@ -1,11 +1,10 @@
-import os
-from separability.experiments.data_provider import DataProvider
+from xaitestframework.dataloading import Dataloader
 
-rule = "LRPCompositeSequentialBFlat"
+rule = "LRPSequentialCompositeA"
 # layers = ['conv2d', 'conv2d_1', 'conv2d_2', 'conv2d_4', 'conv2d_7', 'conv2d_10', 'dense', 'dense_1', 'dense_2']
 layers = ['input_1', 'block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1', 'fc1', 'fc2']
 
-dp = DataProvider("../../data/imagenet/", 50)
+dp = Dataloader("../../data/imagenet/", 50)
 dataset = dp.get_data("val")
 print(dataset.cardinality().numpy())
 

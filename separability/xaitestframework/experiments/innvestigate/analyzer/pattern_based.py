@@ -9,11 +9,7 @@ from __future__ import\
 
 import tensorflow.keras.activations as keras_activations
 import tensorflow.keras.layers as keras_layers
-import tensorflow.keras.models as keras_models
-import tensorflow.keras as keras
 import numpy as np
-import warnings
-
 
 from . import base
 from .. import layers as ilayers
@@ -108,7 +104,7 @@ class PatternNetReverseKernelLayer(kgraph.ReverseMappingBase):
             tmp = reversed_Ys
         else:
             # if linear activation this behaves strange
-            tmp = utils.to_list(grad_act(act_Xs+act_Ys+reversed_Ys))
+            tmp = utils.to_list(grad_act(act_Xs + act_Ys + reversed_Ys))
 
         # Second step: propagate through the pattern layer.
         return grad_pattern(Xs+pattern_Ys+tmp)

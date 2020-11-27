@@ -1,9 +1,12 @@
 import argparse
+import datetime
+import time
+import os
 import numpy as np
 import tensorflow as tf
-import pandas as pd
 
-import innvestigate
+from . import innvestigate
+from ..dataloading import Dataloader
 
 
 def parse_xai_method(xai_method):
@@ -42,6 +45,9 @@ def parse_xai_method(xai_method):
     return analyzer
 
 
+current_datetime = datetime.datetime.now()
+print(current_datetime)
+
 # Setting up an argument parser for command line calls
 parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
 
@@ -64,72 +70,72 @@ ARGS = parser.parse_args()
 #       MAIN
 #####################
 
-flip_percentage = 0.3
-
 # load data
-if ARGS.data_path:
-    print(ARGS.data_path)
-else:
-    print("load data from " + ARGS.data_name)
-    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+# if ARGS.data_path:
+#     print(ARGS.data_path)
+# else:
+#     print("load data from " + ARGS.data_name)
+#     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+
+dataloader = Dataloader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
+data = dataloader.get_data_partition(ARGS.partition, ARGS.start_index, ARGS.end_index)
 
 # preprocess data
-x_train = x_train / 127.5 - 1
-x_test = x_test / 127.5 - 1
+# x_train = x_train / 127.5 - 1
+# x_test = x_test / 127.5 - 1
 
-# load model
-if ARGS.model_path:
+# get data selection
+# if ARGS.partition == "train":
+#     x_data = x_train[ARGS.start_index:ARGS.end_index]
+# elif ARGS.partition == "test":
+#     x_data = x_test[ARGS.start_index:ARGS.end_index]
+
+# prepare model
+model_path = ARGS.model_path
+if model_path:
     # load model
-    print(ARGS.model_path)
-    model = tf.keras.models.load_model(ARGS.model_path)
+    print(model_path)
+    model = tf.keras.models.load_model(model_path)
 else:
     # optionally add training sequence here??
     print("No model path given! Please add with -m model_path")
 
-# estimate model score before flipping the pixels
-pre_flip_score = model.evaluate(x_test, tf.one_hot(y_test, 10))
 
-# preprocess model
-model_wo_softmax = innvestigate.utils.keras.graph.model_wo_softmax(model)
+print("start relevance map computation now")
+start = time.process_time()
+
+model = innvestigate.utils.keras.graph.model_wo_softmax(model)
 
 # get analyzer
 analyzer = parse_xai_method(ARGS.rule)
-ana = analyzer(model_wo_softmax)
 
-# compute relevance maps
-rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=["conv2d"])
+ana = analyzer(model)
 
-flipped_imgs = []
+R = []
+layer = ARGS.layer
+neuron_selection = ARGS.class_label # np.ones(ARGS.batch_size) * ARGS.class_label    # "index"
 
-# iterate test data
-for i, img in enumerate(x_test):
-    rvalues = np.sum(rmaps["conv2d"][i], axis=2)
+for batch in data:
+    R_batch = ana.analyze(batch[0].numpy(),
+                          neuron_selection=neuron_selection,
+                          explained_layer_names=[layer])
 
-    # sort indices by relevance
-    indices = np.argsort(rvalues, axis=None)
+    R.append(np.array(R_batch[layer]))
 
-    # get first of pixel indices
-    indices = indices[:(flip_percentage * len(indices))]
+R = np.concatenate(R)
 
-    # flip pixels
-    for axis in range(img.shape[2]):
-        uniform_values = np.random.uniform(-1.0, 1.0, len(indices))
-        np.put_along_axis(img[:, :, axis], indices, uniform_values, axis=None)
+print("Relevance maps for x_data computed")
+print("Duration of relevance map computation:")
+print(time.process_time() - start)
 
-    # save to array
-    flipped_imgs.append(img)
+# save relevance maps
+# /data/cluster/users/motzkus/relevance_maps/
+output_dir = ARGS.output_dir
 
-flipped_imgs = np.array(flipped_imgs)
+for attr in [ARGS.data_name, ARGS.model_name, ARGS.layer, ARGS.rule, ARGS.partition, str(ARGS.class_label)]:
 
-# estimate classification accuracy
-flip_score = model.evaluate(flipped_imgs, tf.one_hot(y_test, 10))
+    if not os.path.exists(output_dir + "/" + attr):
+        os.makedirs(output_dir + "/" + attr)
+    output_dir = output_dir + "/" + attr
 
-# print results
-print("estimated score before pixelflipping:")
-print(pre_flip_score)
-print("estimated score after pixelflipping:")
-print(flip_score)
-
-df = pd.DataFrame([[ARGS.data_name, ARGS.model_name, ARGS.rule, str(pre_flip_score), str(flip_score)]],
-                  columns=['dataset', 'model', 'layer', 'method', 'actual score', 'flipped_score'])
-df.to_csv(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "_" + ARGS.rule + ".csv", index=False)
+np.save(output_dir + "/" + str(ARGS.start_index) + "_" + str(ARGS.end_index) + ".npy", R)

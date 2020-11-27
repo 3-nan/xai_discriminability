@@ -8,14 +8,11 @@ from builtins import zip
 ###############################################################################
 ###############################################################################
 import tensorflow as tf
-import tensorflow.keras as keras
 import tensorflow.keras.backend as K
 import tensorflow.keras.layers as keras_layers
 import numpy as np
 
 from ... import layers as ilayers
-from ... import utils as iutils
-from ...utils import keras as kutils
 from ...utils.keras import backend as iK
 from ...utils.keras import graph as kgraph
 from . import utils as rutils

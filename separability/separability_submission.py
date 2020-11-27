@@ -52,9 +52,9 @@ if __name__ == '__main__':
         # generate script
         execthis = ['#!/bin/bash']
         execthis = ['source /home/fe/motzkus/.bashrc']  # enables conda for bash
-        execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
+        # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
         execthis += ['{} activate {}'.format(CONDA, ENV)]  # enter venv
-        execthis += ['python3 one_class_separability.py {}'.format(args)]  # call script with parameters.
+        execthis += ['python3 -m xaitestframework.experiments.one_class_separability {}'.format(args)]  # call script with parameters.
         execthis += ['{} deactivate'.format(CONDA)]  # leave venv
         execthis = '\n'.join(execthis)
 

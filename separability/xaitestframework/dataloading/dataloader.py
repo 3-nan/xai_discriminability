@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 
@@ -14,13 +15,14 @@ def preprocess_imagenet(image, label):
     return image, tf.one_hot(label, depth=1000)
 
 
-class DataProvider:
+class Dataloader:
 
     def __init__(self, datapath, batch_size):
         self.datapath = datapath
         self.batch_size = batch_size
 
     def get_data(self, partition):
+        """ Get the dataset with labels. """
 
         path = self.datapath + partition
 
@@ -48,6 +50,7 @@ class DataProvider:
         return dataset
 
     def get_data_partition(self, partition, start_index, end_index):
+        """ Get a partition of the dataset starting from start_index to end_index"""
 
         dataset = self.get_data(partition)
 
@@ -55,3 +58,19 @@ class DataProvider:
         dataset = dataset.take(int(end_index / self.batch_size) - int(start_index / self.batch_size))
         return dataset
 
+    def get_indices(self, partition):
+        """ Get the indices of the dataset. """
+        dataset = self.get_data(partition)
+        indices = []
+        for batch in dataset.as_numpy_iterator():
+            for index in batch[1]:
+                indices.append(index)
+
+        indices = np.array(indices)
+        print(indices.shape)
+        classes = np.where(np.sum(indices, axis=0) > 0)[0]
+        return indices, classes
+
+    def get_bounding_boxes(self):
+        """ Get the bounding boxes."""
+        pass

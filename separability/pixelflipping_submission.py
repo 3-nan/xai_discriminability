@@ -12,8 +12,8 @@ import subprocess
 import re
 # import urllib.parse
 
-MEM = '20G'
-THREADS = 20
+MEM = '10G'
+THREADS = 10
 CONDA = 'conda'
 ENV = 'separability'
 HERE = os.getcwd()
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         execthis = ['source /home/fe/motzkus/.bashrc']  # enables conda for bash
         # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
         execthis += ['{} activate {}'.format(CONDA, ENV)]  # enter venv
-        execthis += ['python3 -m xaitestframework.experiments.heatmap_computation {}'.format(args)]  # call script with parameters.
+        execthis += ['python3 -m xaitestframework.experiments.pixelflipping {}'.format(args)]  # call script with parameters.
         execthis += ['{} deactivate'.format(CONDA)]  # leave venv
         execthis = '\n'.join(execthis)
 

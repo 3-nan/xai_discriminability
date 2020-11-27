@@ -1,14 +1,10 @@
 import tensorflow as tf
 import numpy as np
 import pandas as pd
-import cv2
-from scipy import misc
 import xmltodict
 import xml
 import collections
 import os
-from separability.experiments import innvestigate
-import matplotlib.pyplot as plt
 
 
 def load_cifar10():
@@ -104,6 +100,7 @@ def load_voc2012():
 
     f = open(path + "ImageSets/Main/train.txt", "r")
     for line in f:
+        print(line)
         filenames.append(line + ".jpg")
 
         label = np.zeros(20)
@@ -113,12 +110,19 @@ def load_voc2012():
         xmlstr = xml.etree.ElementTree.tostring(xml_data, encoding="utf-8", method="xml")
         annotation = dict(xmltodict.parse(xmlstr))['annotation']
 
+        objects = annotation["object"]
+
+        if type(objects) != list:
+            label[classes.index(objects['name'])] = 1
+
         for object in annotation['object']:
             if type(object) == collections.OrderedDict:
                 print(object)
                 print(object['name'])
                 print(classes.index(object['name']))
                 label[classes.index(object['name'])] = 1
+
+        print(label)
 
         labels.append(label)
 
@@ -132,7 +136,8 @@ def load_voc2012():
     return dataset
 
 
-# dataset = load_voc2012()
+dataset = load_voc2012()
+
 
 def load_imagenet_manual():
 
@@ -173,13 +178,11 @@ def preprocess_imagenet(image, label):
     return image, tf.one_hot(label, depth=1000)
 
 
-# tf.compat.v1.enable_eager_execution()
+#dataset = load_imagenet_manual()
+#dataset = dataset.map(preprocess_imagenet)
+#dataset = dataset.batch(32)
 #
-dataset = load_imagenet_manual()
-dataset = dataset.map(preprocess_imagenet)
-dataset = dataset.batch(32)
-#
-dataset = dataset.take(1)
+#dataset = dataset.take(1)
 
 # print(dataset.element_spec)
 # for element in dataset.take(1):
@@ -193,6 +196,6 @@ dataset = dataset.take(1)
 #
 # vgg16.save("../models/vgg16_imagenet/")
 
-model = tf.keras.models.load_model("../models/vgg16_imagenet")
-for layer in model.layers:
-    print(layer.name)
+# model = tf.keras.models.load_model("../models/vgg16_imagenet")
+# for layer in model.layers:
+#     print(layer.name)
