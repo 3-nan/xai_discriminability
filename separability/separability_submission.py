@@ -12,8 +12,8 @@ import subprocess
 import re
 # import urllib.parse
 
-MEM = '20G'
-THREADS = 20
+MEM = '5G'
+THREADS = 5
 CONDA = 'conda'
 ENV = 'separability'
 HERE = os.getcwd()

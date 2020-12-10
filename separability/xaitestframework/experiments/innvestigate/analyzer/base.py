@@ -307,6 +307,7 @@ class AnalyzerNetworkBase(AnalyzerBase):
                                       if layer names provided, a dictionary is returned
         :param stop_mapping_at_layers: None or list of layers to stop mapping at ("output" layers)
         :param r_init: None or Scalar or Array-Like or Dict {layer_name:scalar or array-like} reverse initialization value. Value with which the explanation is initialized.
+                        Has to be scalar or numpy array of shape of neuron_selection
         :param f_init: None or Scalar or Array-Like or Dict {layer_name:scalar or array-like} forward initialization value. Value with which the forward is initialized.
         :param no_forward_pass: If True, no forward pass is calculated for the explanation, instead the activations are loaded from previous usages of the analyze method.
                                 First time using analyze method has no effect as activations have to be saved first time.
@@ -365,8 +366,8 @@ class AnalyzerNetworkBase(AnalyzerBase):
                     pass
                 warnings.warn("stop_mapping_at_layers changed. Make sure new layers are behind old layers, otherwise"
                               "unexpected behaviour.", NoForwardWarning)
-                for rv in rev_layer:
-                    rv.no_forward_pass = False
+               # for rv in rev_layer:
+                #    rv.no_forward_pass = False
 
 
         if stop_mapping_at_layers is not None:
@@ -400,8 +401,17 @@ class AnalyzerNetworkBase(AnalyzerBase):
         self._old_stop_mapping_at_layers = stop_mapping_at_layers
         self._old_neuron_selection = neuron_selection
 
+    def reset_no_forward_pass(self):
 
+        if hasattr(self, "_analyzer_model"):
+            in_layers, rev_layer = self._analyzer_model._reverse_model
 
+            for rl in rev_layer:
+                rl.no_forward_pass = False
+                rl.activations_saved = False
+                rl.input_vals = None
+                rl.hook_vals = None
+                rl.callbacks = None
 
     def _is_resnet_like(self, layer, stop_mapping_at_layers, after_stop_mapping, no_forward_pass=False):
         """

@@ -10,10 +10,13 @@ import getpass
 import shutil
 import subprocess
 import re
+import threading
 # import urllib.parse
+sys.path.append("/home/motzkus/separability")
+import xaitestframework
 
-MEM = '10G'
-THREADS = 5
+MEM = '20G'
+THREADS = 20
 CONDA = 'conda'
 ENV = 'separability'
 HERE = os.getcwd()
@@ -30,6 +33,7 @@ if __name__ == '__main__':
         print('Example: python3 sge_job_simple.py ./path/to/arg_lines.txt')
         print('arg_lines.args should be a file where all the command line args are given in one line')
     else:
+        print("using sys.argv[1] as arg file")
         ARGSFILE = sys.argv[1]
 
     if not os.path.isdir(LOGDIR):
@@ -46,6 +50,14 @@ if __name__ == '__main__':
 
     for i in range(len(all_arg_lines)):
         args = all_arg_lines[i]
+
+        print("running job for {}".format(args))
+        processThread = threading.Thread(target=xaitestframework.experiments.heatmap_computation, args=[args])
+        processThread.start()
+
+
+
+'''
         print('Generating and submitting jobs for:')
         print('    {}'.format(args))
 
@@ -98,3 +110,4 @@ if __name__ == '__main__':
         print('    submitted job executes:')
         print('\n'.join(['>>>> ' + e for e in execthis.split('\n')]))
         print()
+'''

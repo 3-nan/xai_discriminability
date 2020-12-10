@@ -136,7 +136,7 @@ def load_voc2012():
     return dataset
 
 
-dataset = load_voc2012()
+# dataset = load_voc2012()
 
 
 def load_imagenet_manual():
@@ -174,13 +174,17 @@ def preprocess_imagenet(image, label):
     image = tf.image.resize(image, [224, 224])
 
     image = tf.keras.applications.vgg16.preprocess_input(image)
+    # image = tf.keras.applications.resnet.preprocess_input(image)
 
     return image, tf.one_hot(label, depth=1000)
 
 
-#dataset = load_imagenet_manual()
-#dataset = dataset.map(preprocess_imagenet)
-#dataset = dataset.batch(32)
+# dataset = load_imagenet_manual()
+# dataset = dataset.map(preprocess_imagenet)
+# dataset = list(dataset.as_numpy_iterator())
+# print(dataset[0][0].shape)
+# print(dataset[:,0].shape)
+# dataset = dataset.batch(32)
 #
 #dataset = dataset.take(1)
 
@@ -188,14 +192,18 @@ def preprocess_imagenet(image, label):
 # for element in dataset.take(1):
 #     print(element)
 #
-# vgg16 = tf.keras.applications.VGG16(include_top=True, weights='imagenet', classes=1000, classifier_activation='softmax')
+# resnet = tf.keras.applications.resnet.ResNet50(include_top=True, weights='imagenet')
+# vgg16 = tf.keras.applications.VGG16(include_top=True, weights=None, classes=1000, classifier_activation='softmax')
 #
 # vgg16.compile(optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy", "top_k_categorical_accuracy"])
 # score = vgg16.evaluate(dataset)
 # print(score)
 #
-# vgg16.save("../models/vgg16_imagenet/")
+# vgg16.save("../models/vgg16_untrained/")
 
-# model = tf.keras.models.load_model("../models/vgg16_imagenet")
-# for layer in model.layers:
-#     print(layer.name)
+model = tf.keras.models.load_model("../models/vgg16_imagenet")
+for layer in model.layers:
+    print(layer.name)
+    print(hasattr(layer, 'kernel_initializer'))
+
+print([layer.name for layer in model.layers if hasattr(layer, 'kernel_initializer')])

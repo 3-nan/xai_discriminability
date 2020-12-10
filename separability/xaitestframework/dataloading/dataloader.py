@@ -21,7 +21,7 @@ class Dataloader:
         self.datapath = datapath
         self.batch_size = batch_size
 
-    def get_data(self, partition):
+    def get_data(self, partition, shuffle=False, seed=None):
         """ Get the dataset with labels. """
 
         path = self.datapath + partition
@@ -45,14 +45,21 @@ class Dataloader:
         dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
 
         dataset = dataset.map(preprocess_imagenet)
+
+        if shuffle:
+            if seed:
+                dataset = dataset.shuffle(1000, seed=seed)
+            else:
+                dataset = dataset.shuffle(1000)
+
         dataset = dataset.batch(batch_size=self.batch_size)
 
         return dataset
 
-    def get_data_partition(self, partition, start_index, end_index):
+    def get_data_partition(self, partition, start_index, end_index, shuffle=False, seed=None):
         """ Get a partition of the dataset starting from start_index to end_index"""
 
-        dataset = self.get_data(partition)
+        dataset = self.get_data(partition, shuffle=shuffle, seed=seed)
 
         dataset = dataset.skip(int(start_index / self.batch_size))
         dataset = dataset.take(int(end_index / self.batch_size) - int(start_index / self.batch_size))

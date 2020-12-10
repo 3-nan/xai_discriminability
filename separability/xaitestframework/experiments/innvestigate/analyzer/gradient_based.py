@@ -14,6 +14,8 @@ from . import base
 from . import reverse_map
 from . import wrapper
 from .. import layers as ilayers
+from .. import utils as iutils
+from ..utils import keras as kutils
 from ..utils.keras import checks as kchecks
 from ..utils.keras import graph as kgraph
 

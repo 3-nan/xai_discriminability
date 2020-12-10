@@ -1,6 +1,7 @@
 # Get Python six functionality:
 from __future__ import\
     absolute_import, print_function, division, unicode_literals
+from builtins import zip
 import six
 import warnings
 warnings.filterwarnings("default", category=DeprecationWarning)
@@ -10,7 +11,14 @@ warnings.filterwarnings("default", category=DeprecationWarning)
 ###############################################################################
 
 import inspect
+import tensorflow as tf
+import tensorflow.keras as keras
+import tensorflow.keras.backend as K
+import tensorflow.keras.models as keras_models
+import tensorflow.keras.layers as keras_layers
 
+
+import numpy as np
 from .. import base as base
 from .. import reverse_map
 from ...utils.keras import checks as kchecks

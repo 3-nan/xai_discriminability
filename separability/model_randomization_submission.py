@@ -12,14 +12,14 @@ import subprocess
 import re
 # import urllib.parse
 
-MEM = '10G'
+MEM = '15G'
 THREADS = 5
 CONDA = 'conda'
 ENV = 'separability'
 HERE = os.getcwd()
 JOBNAME = None
-LOGDIR = 'logs-separability'
-SCRIPTDIR = 'scripts-separability'
+LOGDIR = '/home/fe/motzkus/logs-separability'
+SCRIPTDIR = '/home/fe/motzkus/scripts-separability'
 
 if __name__ == '__main__':
 
@@ -52,11 +52,9 @@ if __name__ == '__main__':
         # generate script
         execthis = ['#!/bin/bash']
         execthis = ['source /home/fe/motzkus/.bashrc']  # enables conda for bash
-        # execthis = ['source /home/motzkus/.bashrc']  # enables conda for bash
-        # execthis += ['cd {}/separability'.format(HERE)]  # go to python root
-
+        # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
         execthis += ['{} activate {}'.format(CONDA, ENV)]  # enter venv
-        execthis += ['python3 -m xaitestframework.experiments.heatmap_computation {}'.format(args)]  # call script with parameters.
+        execthis += ['python3 -m xaitestframework.experiments.model_parameter_randomization {}'.format(args)]  # call script with parameters.
         execthis += ['{} deactivate'.format(CONDA)]  # leave venv
         execthis = '\n'.join(execthis)
 

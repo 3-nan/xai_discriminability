@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description="Test and evaluate multiple xai met
 
 parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
 parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
-parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
+parser.add_argument("-o", "--output_dir", type=str, default="/output", help="Sets the output directory for the results")
 parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
 parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
 parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")

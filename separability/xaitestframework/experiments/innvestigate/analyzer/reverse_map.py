@@ -182,7 +182,8 @@ class ReplacementLayer():
 
         def grad(dy, variables=None):  # variables=None and None as output necessary as toNumber requires two arguments
 
-            return dy * tf.sign(X) * value, None
+            #return dy * tf.sign(X) * value, None
+            return dy * 1/X * value, None
 
         return y, grad
 
@@ -336,6 +337,17 @@ class ReplacementLayer():
 
                     neuron_selection_tmp = [[n] for n in neuron_selection]
                     neuron_selection_tmp = tf.constant(neuron_selection_tmp)
+                elif hasattr(neuron_selection, "shape") and len(neuron_selection.shape) == 2:
+                    # select neuron_selection[i] neuron indices for batch i
+                    # tf.gather_nd requires shape [batch_size, neuron indices, 1]
+                    # except if one neuron only, then [batch_size, single_neuron_index=1]
+                    if len(neuron_selection[0]) > 1:
+                        # if several neurons per sample in batch selected
+                        neuron_selection_tmp = np.expand_dims(neuron_selection, axis=-1)
+                        neuron_selection_tmp = tf.constant(neuron_selection_tmp)
+                    else:
+                        neuron_selection_tmp = tf.constant(neuron_selection)
+
                 else:
                     raise ValueError(
                         "Parameter neuron_selection only accepts the following values: None, 'all', 'max_activation', <int>, <list>, <one-dimensional array>")
@@ -546,8 +558,8 @@ class ReverseModel():
         reverse_ins, reverse_layers = self._reverse_model
 
         warnings.simplefilter("always")
-        if stop_mapping_at_layers is not None and (isinstance(neuron_selection, int) or isinstance(neuron_selection, list) or isinstance(neuron_selection, np.ndarray)):
-            warnings.warn("You are specifying layers to stop forward pass at, and also neuron-selecting by index. Please make sure the corresponding shapes fit together!")
+      #  if stop_mapping_at_layers is not None and (isinstance(neuron_selection, int) or isinstance(neuron_selection, list) or isinstance(neuron_selection, np.ndarray)):
+       #     warnings.warn("You are specifying layers to stop forward pass at, and also neuron-selecting by index. Please make sure the corresponding shapes fit together!")
 
         if not isinstance(Xs, tf.Tensor):
             try:
@@ -638,7 +650,7 @@ class ReverseModel():
             for layer in reverse_ins:
                 if layer.activations_saved == False:
                     raise AttributeError("activations have to be saved first! Use for instance 'no_forward_pass=True'")
-                activations[layer.name] = layer.hook_vals
+                activations[layer.name] = layer.hook_vals[0].numpy()  # first tuple of it are output values of layer
 
             return activations
 
@@ -646,7 +658,7 @@ class ReverseModel():
         if layer_names is "all":
             for layer in reverse_layers:
                 if layer.activations_saved == True:
-                    activations[layer.name] = layer.hook_vals
+                    activations[layer.name] = layer.hook_vals[0].numpy()
 
             return activations
 
@@ -657,7 +669,7 @@ class ReverseModel():
             if len(layer) > 0:
                 if layer[0].activations_saved == False:
                     raise AttributeError(f"activations of <<{name}>> have to be saved first! Use for instance 'no_forward_pass=True'")
-                activations[name] = layer[0].hook_vals
+                activations[name] = layer[0].hook_vals[0].numpy()
 
         return activations
 
