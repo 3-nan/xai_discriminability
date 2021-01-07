@@ -3,56 +3,72 @@ import datetime
 import time
 import os
 import numpy as np
-import tensorflow as tf
 
-from . import innvestigate
-from ..dataloading import Dataloader
+from ..dataloading.dataloader import get_dataloader
+from ..helpers.model_helper import init_model
+from ..helpers.universal_helper import extract_filename
 
 
-def parse_xai_method(xai_method):
-    # Gradient methods
-    if xai_method == "Gradient":
-        analyzer = innvestigate.analyzer.Gradient
-    elif xai_method == "SmoothGrad":
-        analyzer = innvestigate.analyzer.SmoothGrad
-    # LRP methods
-    elif xai_method == "LRPZ":
-        analyzer = innvestigate.analyzer.LRPZ
-    elif xai_method == 'LRPEpsilon':
-        analyzer = innvestigate.analyzer.LRPEpsilon
-    elif xai_method == 'LRPWSquare':
-        analyzer = innvestigate.analyzer.LRPWSquare
-    elif xai_method == 'LRPGamma':
-        analyzer = innvestigate.analyzer.LRPGamma
-    elif xai_method == 'LRPAlpha1Beta0':
-        analyzer = innvestigate.analyzer.LRPAlpha1Beta0
-    elif xai_method == 'LRPAlpha2Beta1':
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1
-    elif xai_method == 'LRPSequentialPresetA':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetA
-    elif xai_method == 'LRPSequentialPresetB':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetB
-    elif xai_method == 'LRPSequentialCompositeA':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeA
-    elif xai_method == 'LRPSequentialCompositeB':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeB
-    elif xai_method == 'LRPSequentialCompositeBFlat':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeBFlat
-    # innvestigate.analyzer.LRPGamma
-    else:
-        print("analyzer name " + xai_method + " not correct")
-        analyzer = None
-    return analyzer
+def get_relevance_dir_path(output_dir, data_name, model_name, layer, rule, partition, class_name):
+    """ Computes directory path to save computed relevance to. """
+
+    # remove backslash at the end
+    if output_dir[-1] == "/":
+        output_dir = output_dir[:-1]
+
+    for attr in [data_name, model_name, layer, rule, partition, str(class_name)]:
+
+        if not os.path.exists(output_dir + "/" + attr):
+            os.makedirs(output_dir + "/" + attr)
+        output_dir = output_dir + "/" + attr
+
+    return output_dir
+
+
+def compute_relevances_for_class(data_path, data_name, dataloader_name, partition, batch_size, startidx, endidx, model_path, model_name, layer_names, xai_method, class_name, output_dir):
+    """ Function to compute the attributed relevances for the selected class. """
+
+    # init model
+    model = init_model(model_path)
+
+    # initialize dataloader
+    dataloader = get_dataloader(dataloader_name)
+    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+
+    # get dataset partition
+    data, labels = dataloader.get_dataset_partition(startidx=startidx, endidx=endidx, batched=True)
+
+    for i, batch in enumerate(data):
+
+        print("compute relevances for batch {}".format(i))
+        preprocessed, _ = dataloader.preprocess_data(batch, labels[i])
+
+        # compute relevance
+        R = model.compute_relevance(preprocessed, layer_names, class_name, xai_method, additional_parameter=None)
+
+        for layer_name in layer_names:
+            layer_output_dir = get_relevance_dir_path(output_dir, data_name, model_name, layer_name, xai_method, partition, class_name)
+            for r, relevance in enumerate(R[layer_name]):
+                fname = extract_filename(batch[r])
+                filename = layer_output_dir + "/" + fname + ".npy"
+                np.save(filename, relevance)
 
 
 current_datetime = datetime.datetime.now()
 print(current_datetime)
+
+
+def decode_layernames(string):
+    """ Decodes the layer_names string to a list of strings. """
+    return string.split(":")
+
 
 # Setting up an argument parser for command line calls
 parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
 
 parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
 parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
+parser.add_argument("-dl", "--dataloader_name", type=str, default=None, help="The name of the dataloader class to be used.")
 parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
 parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
 parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
@@ -61,7 +77,7 @@ parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index o
 parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
 parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
 parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
+parser.add_argument("-l", "--layer_names", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
 parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
 
 ARGS = parser.parse_args()
@@ -70,72 +86,24 @@ ARGS = parser.parse_args()
 #       MAIN
 #####################
 
-# load data
-# if ARGS.data_path:
-#     print(ARGS.data_path)
-# else:
-#     print("load data from " + ARGS.data_name)
-#     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
-
-dataloader = Dataloader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
-data = dataloader.get_data_partition(ARGS.partition, ARGS.start_index, ARGS.end_index)
-
-# preprocess data
-# x_train = x_train / 127.5 - 1
-# x_test = x_test / 127.5 - 1
-
-# get data selection
-# if ARGS.partition == "train":
-#     x_data = x_train[ARGS.start_index:ARGS.end_index]
-# elif ARGS.partition == "test":
-#     x_data = x_test[ARGS.start_index:ARGS.end_index]
-
-# prepare model
-model_path = ARGS.model_path
-if model_path:
-    # load model
-    print(model_path)
-    model = tf.keras.models.load_model(model_path)
-else:
-    # optionally add training sequence here??
-    print("No model path given! Please add with -m model_path")
-
-
 print("start relevance map computation now")
 start = time.process_time()
 
-model = innvestigate.utils.keras.graph.model_wo_softmax(model)
+compute_relevances_for_class(ARGS.data_path,
+                             ARGS.data_name,
+                             ARGS.dataloader_name,
+                             ARGS.partition,
+                             ARGS.batch_size,
+                             ARGS.start_index,
+                             ARGS.end_index,
+                             ARGS.model_path,
+                             ARGS.model_name,
+                             ARGS.layer_names,
+                             ARGS.rule,
+                             ARGS.class_label,
+                             ARGS.output_dir)
 
-# get analyzer
-analyzer = parse_xai_method(ARGS.rule)
-
-ana = analyzer(model)
-
-R = []
-layer = ARGS.layer
-neuron_selection = ARGS.class_label # np.ones(ARGS.batch_size) * ARGS.class_label    # "index"
-
-for batch in data:
-    R_batch = ana.analyze(batch[0].numpy(),
-                          neuron_selection=neuron_selection,
-                          explained_layer_names=[layer])
-
-    R.append(np.array(R_batch[layer]))
-
-R = np.concatenate(R)
 
 print("Relevance maps for x_data computed")
 print("Duration of relevance map computation:")
 print(time.process_time() - start)
-
-# save relevance maps
-# /data/cluster/users/motzkus/relevance_maps/
-output_dir = ARGS.output_dir
-
-for attr in [ARGS.data_name, ARGS.model_name, ARGS.layer, ARGS.rule, ARGS.partition, str(ARGS.class_label)]:
-
-    if not os.path.exists(output_dir + "/" + attr):
-        os.makedirs(output_dir + "/" + attr)
-    output_dir = output_dir + "/" + attr
-
-np.save(output_dir + "/" + str(ARGS.start_index) + "_" + str(ARGS.end_index) + ".npy", R)

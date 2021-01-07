@@ -322,10 +322,10 @@ class AnalyzerNetworkBase(AnalyzerBase):
         if isinstance(explained_layer_names, list):
             for l in explained_layer_names:
                 if not isinstance(l, str):
-                    raise AttributeError("Parameter explained_layer_names has to be None or a list of strings")
+                    raise AttributeError("Parameter explained_layer_names has to be None or a list of strings (1)")
         elif explained_layer_names is not None:
             # not list and not None
-            raise AttributeError("Parameter explained_layer_names has to be None or a list of strings")
+            raise AttributeError("Parameter explained_layer_names has to be None or a list of strings (2)")
 
         if isinstance(stop_mapping_at_layers, list):
             for l in stop_mapping_at_layers:
@@ -477,10 +477,10 @@ class AnalyzerNetworkBase(AnalyzerBase):
         if isinstance(explained_layer_names, list):
             for l in explained_layer_names:
                 if not isinstance(l, str):
-                    raise AttributeError("Parameter explained_layer_names has to be None or a list of strings")
+                    raise AttributeError("Parameter explained_layer_names has to be None or a list of strings (3)")
         elif (explained_layer_names is not None) and type(explained_layer_names) != str:
             # not list and not None
-            raise AttributeError("Parameter explained_layer_names has to be None or a list of strings")
+            raise AttributeError("Parameter explained_layer_names has to be None or a list of strings (4)")
 
         hm = self._analyzer_model.get_explanations(explained_layer_names)
         hm = self._postprocess_analysis(hm)

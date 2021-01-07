@@ -136,7 +136,7 @@ def load_voc2012():
     return dataset
 
 
-# dataset = load_voc2012()
+dataset = load_voc2012()
 
 
 def load_imagenet_manual():
@@ -201,9 +201,9 @@ def preprocess_imagenet(image, label):
 #
 # vgg16.save("../models/vgg16_untrained/")
 
-model = tf.keras.models.load_model("../models/vgg16_imagenet")
-for layer in model.layers:
-    print(layer.name)
-    print(hasattr(layer, 'kernel_initializer'))
-
-print([layer.name for layer in model.layers if hasattr(layer, 'kernel_initializer')])
+# model = tf.keras.models.load_model("../models/vgg16_imagenet")
+# for layer in model.layers:
+#     print(layer.name)
+#     print(hasattr(layer, 'kernel_initializer'))
+#
+# print([layer.name for layer in model.layers if hasattr(layer, 'kernel_initializer')])

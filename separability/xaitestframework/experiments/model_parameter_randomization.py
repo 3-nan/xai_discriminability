@@ -2,7 +2,6 @@ import argparse
 import os
 import numpy as np
 import tensorflow as tf
-import pandas as pd
 
 from . import innvestigate
 from ..dataloading import Dataloader
@@ -111,7 +110,13 @@ def cascading_layer_randomization(model, analyzer, bottom_layer, x_test, y_test,
 
         rmaps = np.array(rmaps[ARGS.layer])
 
-        np.save(output_dir + layer.name + ".npy", rmaps)
+        if not top_down:
+            if not os.path.exists(output_dir + "bottom_up/"):
+                os.makedirs(output_dir + "bottom_up/")
+            np.save(output_dir + "bottom_up/" + layer.name + ".npy", rmaps)
+
+        else:
+            np.save(output_dir + layer.name + ".npy", rmaps)
 
 
 # CASE 2: independent randomization
@@ -150,11 +155,9 @@ for dp in datapartition.as_numpy_iterator():
 
 x_test = np.array(x_test)[0]
 y_test = np.array(y_test)[0]
-# y_test = np.array([np.where(r==1)[0][0] for r in y_test])
-# y_test = np.ravel(y_test)
+
 y_test = np.argmax(y_test, axis=1)
 print(y_test.shape)
-print(y_test)
 print(x_test.shape)
 
 # make output dirs
@@ -193,5 +196,7 @@ np.save(output_dir + "/" + "not_randomized" + ".npy", rmaps)
 
 print("cascading layer randomization")
 cascading_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/cascading/")
+print("cascading layer randomization bottom up")
+cascading_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/cascading/", top_down=False)
 print("independent layer randomization")
 independent_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/independent/")

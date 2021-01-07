@@ -39,46 +39,65 @@ def rebuild_original(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
-modelpath = "../models/vgg16_imagenet/"
-# setup = "imagenet_vgg16_LRPSequentialCompositeBFlat"
-setup = "imagenet_vgg16_LRPGamma"
-dir = "results/model_parameter_randomization/"
-index = 41
+def plot_model_parameter_randomization_example(modelpath, setup, dir, index, independent=False, bottom_up=False):
 
-print(dir + setup)
+    print(dir + setup)
 
-model = tf.keras.models.load_model(modelpath)
-layers = [layer.name for layer in model.layers if hasattr(layer, 'kernel_initializer')]
-print(layers)
+    model = tf.keras.models.load_model(modelpath)
+    layers = [layer.name for layer in model.layers if hasattr(layer, 'kernel_initializer')]
+    print(layers)
 
-original = np.load(dir + setup + "/" + "original.npy")[index]
-relevance = np.load(dir + setup + "/not_randomized.npy")[index]
+    original = np.load(dir + setup + "/" + "original.npy")[index]
+    relevance = np.load(dir + setup + "/not_randomized.npy")[index]
 
-fig, axs = plt.subplots(4, 5, figsize=(12, 12), sharex=True, sharey=True)
-axs[0, 0].imshow(rebuild_original(original))
-axs[0, 0].set_title("original")
-axs[0, 1].imshow(prep_rmap(relevance))
-axs[0, 1].set_title("none")
+    fig, axs = plt.subplots(4, 5, figsize=(12, 12), sharex=True, sharey=True)
+    axs[0, 0].imshow(rebuild_original(original))
+    axs[0, 0].set_title("original")
+    axs[0, 1].imshow(prep_rmap(relevance))
+    axs[0, 1].set_title("none")
 
-x = 2
-y = 0
+    x = 2
+    y = 0
 
-for layer in layers:
-    filepath = dir + setup + "/independent/" + layer + ".npy"
-
-    try:
-        rmap = np.load(filepath)[index]
-        axs[y, x].imshow(prep_rmap(rmap))
-        axs[y, x].set_title(layer)
-        if x == 4:
-            y += 1
-            x = 0
+    for layer in layers:
+        if independent:
+            filepath = dir + setup + "/independent/" + layer + ".npy"
+        elif bottom_up:
+            filepath = dir + setup + "/cascading/bottom_up/" + layer + ".npy"
         else:
-            x += 1
-    except IOError:
-        print("No file for layer {} found".format(layer))
+            filepath = dir + setup + "/cascading/" + layer + ".npy"
 
-plt.tight_layout()
-plt.show()
+        try:
+            rmap = np.load(filepath)[index]
+            axs[y, x].imshow(prep_rmap(rmap))
+            axs[y, x].set_title(layer)
+            if x == 4:
+                y += 1
+                x = 0
+            else:
+                x += 1
+        except IOError:
+            print("No file for layer {} found".format(layer))
 
-fig.savefig("plots/model_parameter_randomization/independent/" + setup + ".png")
+    plt.tight_layout()
+    plt.show()
+
+    if independent:
+        fig.savefig("plots/model_parameter_randomization/independent/" + setup + ".png")
+    elif bottom_up:
+        fig.savefig("plots/model_parameter_randomization/cascading_bottomup/" + setup + ".png")
+    else:
+        fig.savefig("plots/model_parameter_randomization/cascading/" + setup + ".png")
+
+
+modelpath = "../models/vgg16_imagenet/"
+setups = ["imagenet_vgg16_LRPGamma", "imagenet_vgg16_LRPAlpha1Beta0", "imagenet_vgg16_LRPZ",
+          "imagenet_vgg16_LRPSequentialCompositeA", "imagenet_vgg16_LRPSequentialCompositeBFlat",
+          "imagenet_vgg16_Gradient", "imagenet_vgg16_SmoothGrad"]
+dir = "results/model_parameter_randomization/"
+index = 45
+independent = False
+bottom_up = False
+
+for setup in setups:
+    plot_model_parameter_randomization_example(modelpath, setup, dir, index, independent, bottom_up)

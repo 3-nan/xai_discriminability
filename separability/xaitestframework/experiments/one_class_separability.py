@@ -1,44 +1,48 @@
 import argparse
 import datetime
+import time
 import os
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
 
-# from . import innvestigate
-from ..dataloading import Dataloader
+from ..dataloading.dataloader import get_dataloader
+from ..helpers.universal_helper import extract_filename, join_path
 
 
-def load_relevance_map_selection(data_path, partition, label, indices):
+def compute_relevance_path(relevance_path, data_name, model_name, layer, rule):
+    """ Compute path, where relevance maps are stored. """
+
+    relevance_path = join_path(relevance_path, [data_name, model_name, layer, rule])
+
+    return relevance_path
+
+
+def load_relevance_map_selection(data_path, partition, label, filenames):
     """ Load a selection of relevance maps
     label: int - class label to get data for
     """
     rmaps = []
     labels = []
 
-    for dir in os.scandir(data_path + "/" + partition):
-
-        # load data from indices
-        data_files = os.listdir(dir.path)
-        data_files.sort(key=lambda f: int(f.split("_", 1)[0]))
+    for dir in os.scandir(join_path(data_path, partition)):
 
         R_c = []
-        for file in data_files:
-            R_c.append(np.load(dir.path + "/" + file))
+
+        for filename in filenames:
+            R_c.append(np.load(join_path(dir.path, filename) + ".npy"))
 
         R_c = np.concatenate(R_c)
 
-        rmaps.append(R_c[indices])
+        rmaps.append(R_c)
 
-        # get number of entries per data file
-        # size = int(data_files[0].split("_", 1)[1].split(".")[0]) * 5
-
+        # add labels for correct / incorrect class to labels
         if dir.name == str(label):
             # append true to labels
-            labels.append(np.ones(np.sum(indices)))
+            labels.append(np.ones(len(filenames)))
         else:
             # append false to labels
-            labels.append(np.zeros(np.sum(indices)))
+            labels.append(np.zeros(len(filenames)))
 
     rmaps = np.concatenate(rmaps)
     labels = np.concatenate(labels)
@@ -52,7 +56,61 @@ def load_relevance_map_selection(data_path, partition, label, indices):
     return rmaps[p], labels[p]
 
 
-# def one_class_separability():
+def estimate_separability_score(data_path, data_name, dataloader_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
+    """ Compute the separability score for the provided relevances. """
+
+    relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
+
+    # initialize dataloader
+    dataloader = get_dataloader(dataloader_name)
+    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+    test_dataloader = dataloader(data_path=data_path, partition="val", batch_size=batch_size)
+
+    # iterate classes
+    for classlabel in np.unique(dataloader.labels):
+        print("estimate one class separability for class " + str(classlabel))
+
+        # get indices of datapoints relating classlabel
+        indices = np.array([dataloader.preprocess_label(label) for label in dataloader.labels])
+        indices = (indices[:, classlabel] == 1).flatten()
+
+        filenames = [extract_filename(dataloader.samples[i]) for i in indices]
+
+        # load relevance maps from train partition to train clf
+        Rc_data, labels = load_relevance_map_selection(relevance_path, 'train', classlabel, filenames)
+
+        if len(Rc_data.shape) == 4:
+            Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
+
+        clf = LinearSVC()
+        clf.fit(Rc_data, labels)
+
+        # load test data
+        test_indices = np.array([test_dataloader.preprocess_label(label) for label in test_dataloader.labels])
+        test_indices = (test_indices[:, classlabel] == 1).flatten()
+
+        test_filenames = [extract_filename(test_dataloader.samples[i]) for i in test_indices]
+
+        Rc_test, test_labels = load_relevance_map_selection(relevance_path, 'val', classlabel, test_filenames)
+
+        if len(Rc_test.shape) == 4:
+            Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
+
+        # compute score
+        score = clf.score(Rc_test, test_labels)
+
+        print("separability score for class " + str(c))
+        print(score)
+
+        if not os.path.exists(output_dir + data_name + "_" + model_name):
+            os.makedirs(output_dir + data_name + "_" + model_name)
+
+        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
+                          columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
+        df.to_csv(output_dir + data_name + "_" + model_name + "/" + layer_name + "_" + rule + "_"
+                  + str(classlabel) + ".csv", index=False)
+
+
 current_datetime = datetime.datetime.now()
 print(current_datetime)
 
@@ -61,6 +119,7 @@ parser = argparse.ArgumentParser(description="Test and evaluate multiple xai met
 
 parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
 parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
+parser.add_argument("-dl", "--dataloader_name", type=str, default=None, help="The name of the dataloader class to be used.")
 parser.add_argument("-rd", "--relevance_datapath", type=str, default=None, help="data folder of relevance maps")
 parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
 parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
@@ -79,46 +138,19 @@ ARGS = parser.parse_args()
 #       MAIN
 #####################
 
-# load relevance maps
-data_path = ARGS.relevance_datapath + "/" + ARGS.data_name + "/" + ARGS.model_name + "/" + ARGS.layer + "/" + ARGS.rule
+print("start separability score estimation now")
+start = time.process_time()
 
-# (_, y_train), (_, y_test) = tf.keras.datasets.cifar10.load_data()
-dataloader = Dataloader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
-y_train, classes = dataloader.get_indices("train")
-y_test, _ = dataloader.get_indices("val")
+estimate_separability_score(ARGS.datapath,
+                            ARGS.data_name,
+                            ARGS.dataloader_name,
+                            ARGS.relevance_datapath,
+                            ARGS.partition,
+                            ARGS.batch_size,
+                            ARGS.model_name,
+                            ARGS.layer,
+                            ARGS.rule,
+                            ARGS.output_dir)
 
-# get selection of data and relevance maps
-for c in classes: #range(10):
-
-    print("estimate one class separability for class " + str(c))
-
-    indices = (y_train[:, c] == 1).flatten()
-    # load train data
-    Rc_data, labels = load_relevance_map_selection(data_path, 'train', c, indices)
-
-    if len(Rc_data.shape) == 4:
-        Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
-
-    clf = LinearSVC()
-    clf.fit(Rc_data, labels)
-
-    # load test data
-    test_indices = (y_test[:, c] == 1).flatten()
-    Rc_test, test_labels = load_relevance_map_selection(data_path, 'val', c, test_indices)
-
-    if len(Rc_test.shape) == 4:
-        Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
-
-    # compute score
-    score = clf.score(Rc_test, test_labels)
-
-    print("separability score for class " + str(c))
-    print(score)
-
-    if not os.path.exists(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name):
-        os.makedirs(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name)
-
-    df = pd.DataFrame([[ARGS.data_name, ARGS.model_name, ARGS.layer, ARGS.rule, str(score)]],
-                      columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
-    df.to_csv(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "/" + ARGS.layer + "_" + ARGS.rule + "_"
-              + str(c) + ".csv", index=False)
+print("Duration of separability score estimation:")
+print(time.process_time() - start)

@@ -21,8 +21,11 @@ def reformat_string(x):
     # x = np.fromstring(x, dtype=np.float)
     return x
 
+
 setup = "imagenet_vgg16"
 filepath = "results/flipping/descending/" # + setup + "_combined.csv"
+filepath = "results/flipping/descending_abs/"
+filepath = "results/flipping/gaussian/"
 
 plt.figure()
 
