@@ -56,7 +56,7 @@ if __name__ == '__main__':
         # execthis += ['cd {}/separability'.format(HERE)]  # go to python root
 
         execthis += ['{} activate {}'.format(CONDA, ENV)]  # enter venv
-        execthis += ['python3 -m xaitestframework.experiments.heatmap_computation {}'.format(args)]  # call script with parameters.
+        execthis += ['python3 -m xaitestframework.experiments.relevance_computation {}'.format(args)]  # call script with parameters.
         execthis += ['{} deactivate'.format(CONDA)]  # leave venv
         execthis = '\n'.join(execthis)
 

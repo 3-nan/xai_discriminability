@@ -1,0 +1,35 @@
+# config.yaml file
+
+data:
+  datapath: /data/cluster/users/motzkus/data/VOC2012/
+  dataname: voc2012
+  datasetobject: VOC2012Dataset
+  partition: train  # might delete to enable simultaneous computation on train/val dataset
+
+model:
+  modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/model
+  modelname: vgg16
+  modeltype: tensorflow
+
+dirs:
+  explanationdir: /data/cluster/users/motzkus/relevance_maps
+  outputdir: /data/cluster/users/motzkus/results
+
+layers:
+  - input_1
+  - block1_conv1
+  - block2_conv1
+  - block3_conv1
+  - block4_conv1
+  - block5_conv1
+  - fc1
+  - fc2
+
+xai_methods:
+  - LRPZ
+  - LRPAlpha1Beta0
+  - LRPSequentialCompositeA
+  - LRPSequentialCompositeBFlat
+  - LRPGamma
+  - Gradient
+  - SmoothGrad

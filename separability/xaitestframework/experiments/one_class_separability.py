@@ -5,17 +5,11 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
+import tracemalloc
 
-from ..dataloading.dataloader import get_dataloader
-from ..helpers.universal_helper import extract_filename, join_path
-
-
-def compute_relevance_path(relevance_path, data_name, model_name, layer, rule):
-    """ Compute path, where relevance maps are stored. """
-
-    relevance_path = join_path(relevance_path, [data_name, model_name, layer, rule])
-
-    return relevance_path
+from ..dataloading.custom import get_dataset
+from ..dataloading.dataloader import DataLoader
+from ..helpers.universal_helper import extract_filename, join_path, compute_relevance_path
 
 
 def load_relevance_map_selection(data_path, partition, label, filenames):
@@ -56,10 +50,23 @@ def load_relevance_map_selection(data_path, partition, label, filenames):
     return rmaps[p], labels[p]
 
 
-def estimate_separability_score(data_path, data_name, dataloader_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
+def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
     """ Compute the separability score for the provided relevances. """
 
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
+
+    # initialize dataset
+    dataset = get_dataset(dataset_name)
+    dataset = dataset(data_path, "train")
+    dataset.set_mode("raw")
+
+    # initialize testset
+    testset = get_dataset(dataset_name)
+    testset = testset(data_path, "val")
+    testset.set_mode("raw")
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(testset, batch_size=batch_size)
 
     # initialize dataloader
     dataloader = get_dataloader(dataloader_name)
@@ -140,6 +147,7 @@ ARGS = parser.parse_args()
 
 print("start separability score estimation now")
 start = time.process_time()
+tracemalloc.start()
 
 estimate_separability_score(ARGS.datapath,
                             ARGS.data_name,
@@ -152,5 +160,8 @@ estimate_separability_score(ARGS.datapath,
                             ARGS.rule,
                             ARGS.output_dir)
 
+current, peak = tracemalloc.get_traced_memory()
+print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+tracemalloc.stop()
 print("Duration of separability score estimation:")
 print(time.process_time() - start)

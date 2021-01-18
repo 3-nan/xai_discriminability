@@ -4,7 +4,8 @@ import numpy as np
 import tensorflow as tf
 
 from . import innvestigate
-from ..dataloading import Dataloader
+from ..dataloading.dataloader import DataLoader
+from ..helpers.analyzer_helper import parse_xai_method
 
 
 def load_relevance_maps_for_label(data_path, partition, label):
@@ -27,41 +28,17 @@ def load_relevance_maps_for_label(data_path, partition, label):
     return R_c
 
 
-def parse_xai_method(xai_method):
-    # Gradient methods
-    if xai_method == "Gradient":
-        analyzer = innvestigate.analyzer.Gradient
-    elif xai_method == "SmoothGrad":
-        analyzer = innvestigate.analyzer.SmoothGrad
-    # LRP methods
-    elif xai_method == "LRPZ":
-        analyzer = innvestigate.analyzer.LRPZ
-    elif xai_method == 'LRPEpsilon':
-        analyzer = innvestigate.analyzer.LRPEpsilon
-    elif xai_method == 'LRPWSquare':
-        analyzer = innvestigate.analyzer.LRPWSquare
-    elif xai_method == 'LRPGamma':
-        analyzer = innvestigate.analyzer.LRPGamma
-    elif xai_method == 'LRPAlpha1Beta0':
-        analyzer = innvestigate.analyzer.LRPAlpha1Beta0
-    elif xai_method == 'LRPAlpha2Beta1':
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1
-    elif xai_method == 'LRPSequentialPresetA':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetA
-    elif xai_method == 'LRPSequentialPresetB':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetB
-    elif xai_method == 'LRPSequentialCompositeA':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeA
-    elif xai_method == 'LRPSequentialCompositeB':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeB
-    elif xai_method == 'LRPSequentialCompositeBFlat':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeBFlat
-    # innvestigate.analyzer.LRPGamma
-    else:
-        print("analyzer name " + xai_method + " not correct")
-        analyzer = None
-    return analyzer
+def model_parameter_randomization():
+    """ Function to create explanations on randomized models. """
+    # init model
+    model = init_model(model_path)
 
+    # initialize dataloader
+    dataloader = get_dataloader(dataloader_name)
+    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+
+    # preprocess data
+    test_data, test_labels = dataloader.preprocess_data(dataloader.samples, dataloader.labels)
 
 # Setting up an argument parser for command line calls
 parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
@@ -144,7 +121,7 @@ def independent_layer_randomization(model, analyzer, bottom_layer, x_test, y_tes
 
 
 # MAIN FUNCTION
-dataloader = Dataloader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
+dataloader = DataLoader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
 data = dataloader.get_data("val", shuffle=True, seed=42)
 datapartition = data.take(1)
 x_test = []

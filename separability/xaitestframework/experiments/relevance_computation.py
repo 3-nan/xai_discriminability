@@ -3,8 +3,10 @@ import datetime
 import time
 import os
 import numpy as np
+import tracemalloc
 
-from ..dataloading.dataloader import get_dataloader
+from ..dataloading.dataloader import DataLoader
+from ..dataloading.custom import get_dataset
 from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import extract_filename
 
@@ -25,31 +27,33 @@ def get_relevance_dir_path(output_dir, data_name, model_name, layer, rule, parti
     return output_dir
 
 
-def compute_relevances_for_class(data_path, data_name, dataloader_name, partition, batch_size, startidx, endidx, model_path, model_name, layer_names, xai_method, class_name, output_dir):
+def compute_relevances_for_class(data_path, data_name, dataset_name, partition, batch_size, startidx, endidx, model_path, model_name, layer_names, xai_method, class_name, output_dir):
     """ Function to compute the attributed relevances for the selected class. """
+
+    print("compute explanations for layer(s): {}".format(layer_names))
 
     # init model
     model = init_model(model_path)
 
-    # initialize dataloader
-    dataloader = get_dataloader(dataloader_name)
-    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+    # initialize dataset
+    dataset = get_dataset(dataset_name)
+    dataset = dataset(data_path, partition)
+    dataset.set_mode("preprocessed")
 
-    # get dataset partition
-    data, labels = dataloader.get_dataset_partition(startidx=startidx, endidx=endidx, batched=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, startidx=startidx, endidx=endidx)
 
-    for i, batch in enumerate(data):
+    for batch in dataloader:
 
-        print("compute relevances for batch {}".format(i))
-        preprocessed, _ = dataloader.preprocess_data(batch, labels[i])
+        # extract preprocessed images
+        imgs = [sample.image for sample in batch]
 
         # compute relevance
-        R = model.compute_relevance(preprocessed, layer_names, class_name, xai_method, additional_parameter=None)
+        R = model.compute_relevance(imgs, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
 
         for layer_name in layer_names:
             layer_output_dir = get_relevance_dir_path(output_dir, data_name, model_name, layer_name, xai_method, partition, class_name)
             for r, relevance in enumerate(R[layer_name]):
-                fname = extract_filename(batch[r])
+                fname = extract_filename(batch[r].filename)
                 filename = layer_output_dir + "/" + fname + ".npy"
                 np.save(filename, relevance)
 
@@ -68,7 +72,7 @@ parser = argparse.ArgumentParser(description="Test and evaluate multiple xai met
 
 parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
 parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
-parser.add_argument("-dl", "--dataloader_name", type=str, default=None, help="The name of the dataloader class to be used.")
+parser.add_argument("-dl", "--dataset_name", type=str, default=None, help="The name of the dataloader class to be used.")
 parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
 parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
 parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
@@ -88,10 +92,11 @@ ARGS = parser.parse_args()
 
 print("start relevance map computation now")
 start = time.process_time()
+tracemalloc.start()
 
 compute_relevances_for_class(ARGS.data_path,
                              ARGS.data_name,
-                             ARGS.dataloader_name,
+                             ARGS.dataset_name,
                              ARGS.partition,
                              ARGS.batch_size,
                              ARGS.start_index,
@@ -103,7 +108,9 @@ compute_relevances_for_class(ARGS.data_path,
                              ARGS.class_label,
                              ARGS.output_dir)
 
-
+current, peak = tracemalloc.get_traced_memory()
+print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+tracemalloc.stop()
 print("Relevance maps for x_data computed")
 print("Duration of relevance map computation:")
 print(time.process_time() - start)

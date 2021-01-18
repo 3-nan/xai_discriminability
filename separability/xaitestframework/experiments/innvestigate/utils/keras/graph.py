@@ -367,7 +367,9 @@ def pre_softmax_tensors(Xs, should_find_softmax=True):
     ret = []
     for x in Xs:
         layer, node_index, tensor_index = x._keras_history
-        if kchecks.contains_activation(layer, activation="softmax"):
+        if (kchecks.contains_activation(layer, activation="softmax") \
+                or kchecks.contains_activation(layer, activation="tanh") \
+                or kchecks.contains_activation(layer, activation="sigmoid")):
             softmax_found = True
             if isinstance(layer, keras_layers.Activation):
                 ret.append(layer.get_input_at(node_index))

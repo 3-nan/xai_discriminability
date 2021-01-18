@@ -41,16 +41,14 @@ class DataLoader:
 
             self.current_batch += 1
 
-            return np.array(samples)
+            if self.dataset.mode == "raw":
+                return np.array(samples)  # np.array([sample.filename for sample in samples])
 
-            # if self.dataset.mode == "raw":
-            #     return np.array(samples)  # np.array([sample.filename for sample in samples])
-            #
-            # elif self.dataset.mode == "preprocessed":
-            #     return np.array([sample.image for sample in samples]), np.array([sample.one_hot_label for sample in samples])
-            #
-            # elif self.dataset.mode == "binarymap":
-            #     return np.array(samples)
-            #
-            # else:
-            #     return ValueError("dataset mode not valid")
+            elif self.dataset.mode == "preprocessed":
+                return np.array([sample.image for sample in samples]), np.array([sample.one_hot_label for sample in samples])
+
+            elif self.dataset.mode == "binarymap":
+                return np.array(samples)
+
+            else:
+                return ValueError("dataset mode not valid")
