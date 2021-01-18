@@ -12,7 +12,7 @@ output_dir = "/data/cluster/users/motzkus/relevance_maps"
 model_path = "/data/cluster/users/motzkus/models/vgg16_voc2012/model"
 model_name = "vgg16"
 
-partition = "train"  # "train" "val" "test"
+partition = "val"  # "train" "val" "test"
 
 rules = ["LRPSequentialCompositeA", "LRPSequentialCompositeBFlat", "LRPZ", "LRPGamma", "LRPAlpha1Beta0", "Gradient", "SmoothGrad"]
 

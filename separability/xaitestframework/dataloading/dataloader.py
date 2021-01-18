@@ -11,7 +11,11 @@ class DataLoader:
         self.shuffle = shuffle
 
         if endidx > 0:
-            self.idx = list(range(startidx, endidx))
+            assert (startidx < endidx)
+            if endidx > len(self.dataset):
+                self.idx = list(range(startidx, len(self.dataset)))
+            else:
+                self.idx = list(range(startidx, endidx))
         else:
             self.idx = list(range(len(self.dataset)))
 

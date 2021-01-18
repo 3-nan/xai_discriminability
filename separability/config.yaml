@@ -33,3 +33,6 @@ xai_methods:
   - LRPGamma
   - Gradient
   - SmoothGrad
+
+classes:
+  - all

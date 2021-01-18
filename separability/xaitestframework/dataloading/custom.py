@@ -46,11 +46,13 @@ class ImagenetDataset(Dataset):
                 self.samples.append(root + "/" + filename)
                 self.labels.append(label)
 
+        self.classes = np.unique(self.labels)
+
     def __getitem__(self, index):
         """ Get the datapoint at index. """
 
         filename = self.samples[index]
-        label = self.labels[index]
+        label = [self.labels[index]]
 
         if self.mode in ["preprocessed"]:
             image = self.preprocess_image(filename)
@@ -81,6 +83,8 @@ class ImagenetDataset(Dataset):
 
     def preprocess_label(self, label):
         """ Convert label to one hot encoding. """
+        if isinstance(label, list):
+            label = label[0]
         return tf.one_hot(label, depth=1000).numpy()
 
     def get_bounding_boxes(self, partition):
@@ -104,7 +108,7 @@ class VOC2012Dataset(Dataset):
         """ Initialize pascal voc 2012 dataset. """
         super().__init__(datapath, partition)
 
-        self.cmap = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow',
+        self.classes = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow',
                      'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train',
                      'tvmonitor']
         self.labels = []

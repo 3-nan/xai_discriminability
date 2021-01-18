@@ -65,23 +65,18 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
     testset = testset(data_path, "val")
     testset.set_mode("raw")
 
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(testset, batch_size=batch_size)
-
-    # initialize dataloader
-    dataloader = get_dataloader(dataloader_name)
-    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
-    test_dataloader = dataloader(data_path=data_path, partition="val", batch_size=batch_size)
+    # dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    # test_dataloader = DataLoader(testset, batch_size=batch_size)
 
     # iterate classes
-    for classlabel in np.unique(dataloader.labels):
+    for classlabel in dataset.classes:
         print("estimate one class separability for class " + str(classlabel))
 
         # get indices of datapoints relating classlabel
-        indices = np.array([dataloader.preprocess_label(label) for label in dataloader.labels])
-        indices = (indices[:, classlabel] == 1).flatten()
-
-        filenames = [extract_filename(dataloader.samples[i]) for i in indices]
+        filenames = []
+        for i, sample in enumerate(dataset):
+            if classlabel in sample.label:
+                filenames.append(sample.filename)
 
         # load relevance maps from train partition to train clf
         Rc_data, labels = load_relevance_map_selection(relevance_path, 'train', classlabel, filenames)
@@ -93,10 +88,10 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         clf.fit(Rc_data, labels)
 
         # load test data
-        test_indices = np.array([test_dataloader.preprocess_label(label) for label in test_dataloader.labels])
-        test_indices = (test_indices[:, classlabel] == 1).flatten()
-
-        test_filenames = [extract_filename(test_dataloader.samples[i]) for i in test_indices]
+        test_filenames = []
+        for sample in testset:
+            if sample.label == classlabel:
+                test_filenames.append(sample.filename)
 
         Rc_test, test_labels = load_relevance_map_selection(relevance_path, 'val', classlabel, test_filenames)
 
