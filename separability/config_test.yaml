@@ -1,18 +1,18 @@
 # config.yaml file
 
 system_config:
-  backend: sge # ubuntu
+  backend: ubuntu # ubuntu #sge
   conda: conda
   environment: separability
   memory_per_job: 15G
   threads: 5
 
 data:
-  datapath: /data/cluster/users/motzkus/data/VOC2012/
+  datapath: /home/motzkus/data/VOC2012/ # /data/cluster/users/motzkus/data/VOC2012/
   dataname: voc2012
   datasetobject: VOC2012Dataset
   partition: train  # might delete to enable simultaneous computation on train/val dataset
-  batchsize: 50
+  batchsize: 20 # 50
 
 model:
   modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/model
@@ -27,19 +27,19 @@ dirs:
 
 layers:
   - input_1
-  - block1_conv1
-  - block2_conv1
-  - block3_conv1
-  - block4_conv1
-  - block5_conv1
-  - fc1
-  - fc2
+  #- block1_conv1
+  #- block2_conv1
+  #- block3_conv1
+  #- block4_conv1
+  #- block5_conv1
+  #- fc1
+  #- fc2
 
 xai_methods:
-  #- LRPZ
+  - LRPZ
   #- LRPAlpha1Beta0
   #- LRPSequentialCompositeA
-  - LRPSequentialCompositeBFlat
+  #- LRPSequentialCompositeBFlat
   #- LRPGamma
   #- Gradient
   #- SmoothGrad

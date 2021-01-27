@@ -8,6 +8,7 @@ from xml.etree import ElementTree
 import xmltodict
 
 from .datasetinterface import DataSample, Dataset
+from ..helpers.universal_helper import extract_filename
 
 
 def get_dataset(classname):
@@ -95,32 +96,52 @@ class ImagenetDataset(Dataset):
 class VOC2012Sample(DataSample):
     """ Implements a pascal voc 2012 sample. """
 
-    def __init__(self, image, filename, label, one_hot_label):
+    def __init__(self, image, filename, label, one_hot_label, binary_mask):
         super().__init__(image, filename)
         self.label = label
         self.one_hot_label = one_hot_label
+        self.binary_mask = binary_mask
 
 
 class VOC2012Dataset(Dataset):
     """ Implements the pascal voc 2012 dataset. """
 
-    def __init__(self, datapath, partition):
+    def __init__(self, datapath, partition, classidx=None):
         """ Initialize pascal voc 2012 dataset. """
         super().__init__(datapath, partition)
 
-        self.classes = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow',
+        self.cmap = ['aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow',
                      'diningtable', 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train',
                      'tvmonitor']
+        if not classidx:
+            self.classes = self.cmap
+
+        else:
+            self.classes = []
+            for idx in classidx:
+                self.classes.append(self.cmap[idx])
+
         self.labels = []
 
-        f = open(datapath + "ImageSets/Main/" + partition + ".txt", "r")
+        if not classidx:
+            f = open(datapath + "ImageSets/Main/" + partition + ".txt", "r")
+        else:
+            f = []
+            for idx in classidx:
+                classfile = open(datapath + "ImageSets/Main/" + self.cmap[idx] + "_" + partition + ".txt", "r")
+                for line in classfile:
+                    filename, in_class = line.split(" ")
+                    if in_class == 1 and (filename not in f):
+                        f.append(filename)
 
         for line in f:
+            if line.endswith("\n"):
+                line = line[:-1]
             # get image filepath
-            self.samples.append(datapath + "JPEGImages/" + line[:-1] + ".jpg")
+            self.samples.append(datapath + "JPEGImages/" + line + ".jpg")
 
             # parse annotations
-            tree = ElementTree.parse(datapath + "Annotations/" + line[:-1] + ".xml")
+            tree = ElementTree.parse(datapath + "Annotations/" + line + ".xml")
             xml_data = tree.getroot()
             xmlstr = ElementTree.tostring(xml_data, encoding="utf-8", method="xml")
             annotation = dict(xmltodict.parse(xmlstr))['annotation']
@@ -148,18 +169,29 @@ class VOC2012Dataset(Dataset):
         if self.mode in ["preprocessed"]:
             image = self.preprocess_image(filename)
             one_hot_label = self.preprocess_label(label)
+            binary_mask = None
+        elif self.mode == "binary_mask":
+            image = None,
+            one_hot_label = None,
+            binary_mask = self.preprocess_binary_mask(filename)
         else:
             image = None
             one_hot_label = None
+            binary_mask = None
 
-        sample = ImagenetSample(
+        sample = VOC2012Sample(
             image,
             filename,
             label,
-            one_hot_label
+            one_hot_label,
+            binary_mask
         )
 
         return sample
+
+    def classname_to_idx(self, class_name):
+        """ convert a classname to an index. """
+        return self.cmap.index(class_name)
 
     def preprocess_image(self, image):
 
@@ -172,13 +204,53 @@ class VOC2012Dataset(Dataset):
 
     def preprocess_label(self, label):
         """ Convert label to one hot encoding. """
-        one_hot_label = np.zeros(len(self.cmap))
+        one_hot_label = np.zeros(len(self.classes))
 
         for classname in label:
-            one_hot_label[self.cmap.index(classname)] = 1
+            one_hot_label[self.classes.index(classname)] = 1
 
         return one_hot_label
 
-    def get_bounding_boxes(self, partition):
-        """ Get the bounding boxes."""
-        pass
+    def preprocess_binary_mask(self, filename):
+        """ Get the bounding box as binary mask."""
+
+        binary_mask = {}
+        filename = extract_filename(filename)
+
+        # parse annotations
+        tree = ElementTree.parse(self.datapath + "Annotations/" + filename + ".xml")
+        xml_data = tree.getroot()
+        xmlstr = ElementTree.tostring(xml_data, encoding="utf-8", method="xml")
+        annotation = dict(xmltodict.parse(xmlstr))['annotation']
+
+        width = int(annotation["size"]["width"])
+        height = int(annotation["size"]["height"])
+
+        # iterate objects
+        objects = annotation["object"]
+
+        if type(objects) != list:
+            # self.labels.append([objects['name']])
+            mask = np.zeros((width, height), dtype=int)
+
+            mask[int(objects['bndbox']['xmin']):int(objects['bndbox']['xmax']), int(objects['bndbox']['ymin']):int(objects['bndbox']['ymax'])] = 1
+
+            binary_mask[objects['name']] = mask
+
+        else:
+            for object in annotation['object']:
+                if type(object) == collections.OrderedDict:
+                    if object['name'] in binary_mask.keys():
+                        mask = binary_mask[object['name']]
+                    else:
+                        mask = np.zeros((width, height), dtype=int)
+
+                    mask[int(object['bndbox']['xmin']):int(object['bndbox']['xmax']), int(object['bndbox']['ymin']):int(object['bndbox']['ymax'])] = 1
+
+                    binary_mask[object['name']] = mask
+
+        # preprocess binary masks to fit shape of image data
+        for key in binary_mask.keys():
+            binary_mask[key] = tf.image.resize(binary_mask[key][:, :, np.newaxis], [224, 224]).numpy().astype(int)
+
+        return binary_mask

@@ -12,7 +12,7 @@ import subprocess
 import re
 # import urllib.parse
 
-MEM = '5G'
+MEM = '15G'
 THREADS = 5
 CONDA = 'conda'
 ENV = 'separability'

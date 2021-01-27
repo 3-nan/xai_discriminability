@@ -4,41 +4,111 @@ import numpy as np
 import tensorflow as tf
 
 from . import innvestigate
+from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
 from ..helpers.analyzer_helper import parse_xai_method
+from ..helpers.model_helper import init_model
+from ..helpers.universal_helper import extract_filename, compute_relevance_path, join_path
 
 
-def load_relevance_maps_for_label(data_path, partition, label):
-    """ Load a selection of relevance maps
-    label: int - class label to get data for
-    """
+# CASE 1: cascading randomization
+def cascading_layer_randomization(model, dataset, classidx, xai_method, bottom_layer, output_dir, top_down=True):
 
-    dir_path = data_path + "/" + partition + "/" + str(label)
+    # get layers including weights and iterate them
+    layer_names = model.get_layer_names(model, with_weights_only=True)
 
-    # load data from indices
-    data_files = os.listdir(dir_path)
-    data_files.sort(key=lambda f: int(f.split("_", 1)[0]))
+    if top_down:
+        layer_names = layer_names[::-1]
 
-    R_c = []
-    for file in data_files:
-        R_c.append(np.load(dir_path + "/" + file))
+    for layer_name in layer_names:
 
-    R_c = np.concatenate(R_c)
+        diff = []
+        # randomize layer weights
+        model = model.randomize_layer_weights(layer_name)
 
-    return R_c
+        # iterate data and compute explanations
+        for batch in dataloader:
+            imgs = [sample.image for sample in batch]
+            # labels = [sample.one_hot_label for sample in batch]
+
+            explanations = model.compute_relevance(imgs, bottom_layer, neuron_selection=classidx, additional_parameter=None)
+
+            # save explanations
+            dirname = output_dir + "model_parameter_randomization"
+            explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
+
+            for i, explanation in enumerate(explanations[bottom_layer]):
+
+                np.save(dirname + extract_filename(batch[i].filename) + ".npy", explanation)
+
+                # compute similarity
+                original_explanation = np.load(join_path(explanationdir, ["val", classidx]) + batch[i].filename + ".npy")
+
+                diff.append((np.square(original_explanation - explanation)).mean(axis=None))
 
 
-def model_parameter_randomization():
+        # compute relevance maps
+        rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=[bottom_layer])
+
+        rmaps = np.array(rmaps[ARGS.layer])
+
+        if not top_down:
+            if not os.path.exists(output_dir + "bottom_up/"):
+                os.makedirs(output_dir + "bottom_up/")
+            np.save(output_dir + "bottom_up/" + layer_name + ".npy", rmaps)
+
+        else:
+            np.save(output_dir + layer_name + ".npy", rmaps)
+
+
+# CASE 2: independent randomization
+def independent_layer_randomization(model, analyzer, bottom_layer, x_test, y_test, output_dir):
+
+    # get layers including weights and iterate them
+    layer_names = model.get_layer_names(model, with_weights_only=True)
+
+    for layer_name in layer_names:
+        # clone model
+        cloned_model = model.clone()
+
+        # randomize layer weights
+        cloned_model = cloned_model.randomize_layer_weights(layer_name)
+
+        # get analyzer
+        ana = analyzer(cloned_model)
+
+        # compute relevance maps
+        rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=[bottom_layer])
+
+        rmaps = np.array(rmaps[ARGS.layer])
+
+        np.save(output_dir + layer_name + ".npy", rmaps)
+
+
+def model_parameter_randomization(data_path, data_name, dataset_name, partition, batch_size, startidx, endidx, model_path, model_name, layer_names, xai_method, class_name, output_dir):
     """ Function to create explanations on randomized models. """
+
     # init model
     model = init_model(model_path)
 
-    # initialize dataloader
-    dataloader = get_dataloader(dataloader_name)
-    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+    # initialize dataset
+    dataset = get_dataset(dataset_name)
+    dataset = dataset(data_path, partition)
+    # dataset.set_mode("preprocessed")
 
-    # preprocess data
-    test_data, test_labels = dataloader.preprocess_data(dataloader.samples, dataloader.labels)
+    for classidx in dataset.classes:
+
+        class_data = get_dataset(dataset_name)
+        class_data = class_data(data_path, partition, classidx=[classidx])
+        cascading_layer_randomization(model, class_data)
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, startidx=startidx, endidx=endidx)
+
+    # call cascading layer randomization
+    cascading_layer_randomization(model, dataloader)
+    # call cascading layer randomization top-down
+
+    # call independent layer randomization
 
 # Setting up an argument parser for command line calls
 parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")

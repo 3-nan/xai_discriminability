@@ -8,7 +8,7 @@ from sklearn.svm import LinearSVC
 import tracemalloc
 
 from ..dataloading.custom import get_dataset
-from ..dataloading.dataloader import DataLoader
+# from ..dataloading.dataloader import DataLoader
 from ..helpers.universal_helper import extract_filename, join_path, compute_relevance_path
 
 
@@ -26,7 +26,7 @@ def load_relevance_map_selection(data_path, partition, label, filenames):
         for filename in filenames:
             R_c.append(np.load(join_path(dir.path, filename) + ".npy"))
 
-        R_c = np.concatenate(R_c)
+        # R_c = np.append(R_c)
 
         rmaps.append(R_c)
 
@@ -65,9 +65,6 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
     testset = testset(data_path, "val")
     testset.set_mode("raw")
 
-    # dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    # test_dataloader = DataLoader(testset, batch_size=batch_size)
-
     # iterate classes
     for classlabel in dataset.classes:
         print("estimate one class separability for class " + str(classlabel))
@@ -76,10 +73,13 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         filenames = []
         for i, sample in enumerate(dataset):
             if classlabel in sample.label:
-                filenames.append(sample.filename)
+                filenames.append(extract_filename(sample.filename))
 
         # load relevance maps from train partition to train clf
-        Rc_data, labels = load_relevance_map_selection(relevance_path, 'train', classlabel, filenames)
+        Rc_data, labels = load_relevance_map_selection(relevance_path, 'train', dataset.classname_to_idx(classlabel), filenames)
+
+        print(Rc_data.shape)
+        print(labels.shape)
 
         if len(Rc_data.shape) == 4:
             Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
@@ -90,8 +90,8 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         # load test data
         test_filenames = []
         for sample in testset:
-            if sample.label == classlabel:
-                test_filenames.append(sample.filename)
+            if classlabel in sample.label:
+                test_filenames.append(extract_filename(sample.filename))
 
         Rc_test, test_labels = load_relevance_map_selection(relevance_path, 'val', classlabel, test_filenames)
 
@@ -101,7 +101,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         # compute score
         score = clf.score(Rc_test, test_labels)
 
-        print("separability score for class " + str(c))
+        print("separability score for class " + str(classlabel) + " : " + str(dataset.classname_to_idx(classlabel)))
         print(score)
 
         if not os.path.exists(output_dir + data_name + "_" + model_name):
@@ -110,11 +110,13 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
                           columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
         df.to_csv(output_dir + data_name + "_" + model_name + "/" + layer_name + "_" + rule + "_"
-                  + str(classlabel) + ".csv", index=False)
+                  + str(dataset.classname_to_idx(classlabel)) + ".csv", index=False)
 
 
 current_datetime = datetime.datetime.now()
 print(current_datetime)
+
+print("one_class_separability")
 
 # Setting up an argument parser for command line calls
 parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
@@ -123,7 +125,7 @@ parser.add_argument("-d", "--data_path", type=str, default=None, help="data path
 parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
 parser.add_argument("-dl", "--dataloader_name", type=str, default=None, help="The name of the dataloader class to be used.")
 parser.add_argument("-rd", "--relevance_datapath", type=str, default=None, help="data folder of relevance maps")
-parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
+parser.add_argument("-o", "--output_dir", type=str, default="/output", help="Sets the output directory for the results")
 parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
 parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
 parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
@@ -144,7 +146,7 @@ print("start separability score estimation now")
 start = time.process_time()
 tracemalloc.start()
 
-estimate_separability_score(ARGS.datapath,
+estimate_separability_score(ARGS.data_path,
                             ARGS.data_name,
                             ARGS.dataloader_name,
                             ARGS.relevance_datapath,

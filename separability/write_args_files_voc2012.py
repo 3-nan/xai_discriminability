@@ -1,18 +1,21 @@
 import math
 from xaitestframework.dataloading.custom import get_dataset
 
+task = "relevances"
+
 data_path = "/data/cluster/users/motzkus/data/VOC2012/"
 data_name = "voc2012"
 dataloader_name = "VOC2012Dataloader" # not used anymore??
 dataset_name = "VOC2012Dataset"
 classindices = range(20)
 
-output_dir = "/data/cluster/users/motzkus/relevance_maps"
+relevance_datapath = "/data/cluster/users/motzkus/relevance_maps"
+output_dir = "/data/cluster/users/motzkus/results/"
 
 model_path = "/data/cluster/users/motzkus/models/vgg16_voc2012/model"
 model_name = "vgg16"
 
-partition = "val"  # "train" "val" "test"
+partition = "train"  # "train" "val" "test"
 
 rules = ["LRPSequentialCompositeA", "LRPSequentialCompositeBFlat", "LRPZ", "LRPGamma", "LRPAlpha1Beta0", "Gradient", "SmoothGrad"]
 
@@ -20,39 +23,67 @@ rules = ["LRPSequentialCompositeA", "LRPSequentialCompositeBFlat", "LRPZ", "LRPG
 layers = ['input_1', 'block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1', 'fc1', 'fc2']
 batch_size = 50
 
-dataset = get_dataset(dataset_name)
-dataset = dataset("../../data/VOC2012/", partition)
+if task == "relevances":
 
-print(len(dataset))
+    dataset = get_dataset(dataset_name)
+    dataset = dataset("../../data/VOC2012/", partition)
 
-job_size = 1000     # number of images to process per job
-argument_list = []
+    print(len(dataset))
 
-for rule in rules:
+    job_size = 1000     # number of images to process per job
+    argument_list = []
 
-    for c in classindices:
-        base_args = ""
+    for rule in rules:
 
-        base_args += "-d " + data_path
-        base_args += " -dn " + data_name
-        base_args += " -dl " + dataset_name
-        base_args += " -o " + output_dir
-        base_args += " -m " + model_path
-        base_args += " -mn " + model_name
+        for c in classindices:
+            base_args = ""
 
-        for i in range(math.ceil(len(dataset)/job_size)):        # 50000/job_size)):
+            base_args += "-d " + data_path
+            base_args += " -dn " + data_name
+            base_args += " -dl " + dataset_name
+            base_args += " -o " + relevance_datapath
+            base_args += " -m " + model_path
+            base_args += " -mn " + model_name
 
-            args = base_args + " -si " + str(i*job_size) + " -ei " + str((i+1)*job_size)
-            args += " -p " + partition
-            args = args + " -cl " + str(c)
-            args = args + " -r " + rule
-            args = args + " -l " + ":".join(layers)
-            args += " -bs " + str(batch_size)
+            for i in range(math.ceil(len(dataset)/job_size)):        # 50000/job_size)):
+
+                args = base_args + " -si " + str(i*job_size) + " -ei " + str((i+1)*job_size)
+                args += " -p " + partition
+                args = args + " -cl " + str(c)
+                args = args + " -r " + rule
+                args = args + " -l " + ":".join(layers)
+                args += " -bs " + str(batch_size)
+
+                argument_list.append(args)
+
+    # write out to file
+    output_file = "relevance" + ".args"
+    print('writing converted arguments to {}'.format(output_file))
+    with open(output_file, 'wt') as f:
+        f.write('\n'.join(argument_list))
+
+elif task == "separability":
+
+    argument_list = []
+
+    base_args = ""
+    base_args += "-d " + data_path
+    base_args += " -dn " + data_name
+    base_args += " -dl " + dataset_name
+    base_args += " -rd " + relevance_datapath
+    base_args += " -o " + output_dir + "separability/"
+    base_args += " -m " + model_path
+    base_args += " -mn " + model_name
+
+    for rule in rules:
+        for layer in layers:
+            args = base_args + " -r " + rule
+            args += " -l " + layer
 
             argument_list.append(args)
 
-# write out to file
-output_file = "relevance" + ".args"
-print('writing converted arguments to {}'.format(output_file))
-with open(output_file, 'wt') as f:
-    f.write('\n'.join(argument_list))
+    # write out to file
+    output_file = "separability.args"
+    print('writing converted arguments to {}'.format(output_file))
+    with open(output_file, "wt") as f:
+        f.write("\n".join(argument_list))

@@ -27,7 +27,7 @@ def get_relevance_dir_path(output_dir, data_name, model_name, layer, rule, parti
     return output_dir
 
 
-def compute_relevances_for_class(data_path, data_name, dataset_name, partition, batch_size, startidx, endidx, model_path, model_name, layer_names, xai_method, class_name, output_dir):
+def compute_relevances_for_class(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Function to compute the attributed relevances for the selected class. """
 
     print("compute explanations for layer(s): {}".format(layer_names))
@@ -58,59 +58,64 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
                 np.save(filename, relevance)
 
 
-current_datetime = datetime.datetime.now()
-print(current_datetime)
+if __name__ == "__main__":
+    current_datetime = datetime.datetime.now()
+    print(current_datetime)
+
+    print("relevance computation")
 
 
-def decode_layernames(string):
-    """ Decodes the layer_names string to a list of strings. """
-    return string.split(":")
+    def decode_layernames(string):
+        """ Decodes the layer_names string to a list of strings. """
+        return string.split(":")
 
 
-# Setting up an argument parser for command line calls
-parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
+    # Setting up an argument parser for command line calls
+    parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
 
-parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
-parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
-parser.add_argument("-dl", "--dataset_name", type=str, default=None, help="The name of the dataloader class to be used.")
-parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
-parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
-parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
-parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
-parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
-parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
-parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
-parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-parser.add_argument("-l", "--layer_names", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
-parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
+    parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
+    parser.add_argument("-dl", "--dataset_name", type=str, default=None, help="The name of the dataloader class to be used.")
+    parser.add_argument("-rd", "--relevance_datapath", type=str, default=None, help="data folder of relevance maps")
+    parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
+    parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
+    parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
+    parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
+    parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
+    parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
+    parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
+    parser.add_argument("-l", "--layer_names", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
+    parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
 
-ARGS = parser.parse_args()
+    ARGS = parser.parse_args()
 
-#####################
-#       MAIN
-#####################
+    #####################
+    #       MAIN
+    #####################
 
-print("start relevance map computation now")
-start = time.process_time()
-tracemalloc.start()
+    print("start relevance map computation now")
+    start = time.process_time()
+    tracemalloc.start()
 
-compute_relevances_for_class(ARGS.data_path,
-                             ARGS.data_name,
-                             ARGS.dataset_name,
-                             ARGS.partition,
-                             ARGS.batch_size,
-                             ARGS.start_index,
-                             ARGS.end_index,
-                             ARGS.model_path,
-                             ARGS.model_name,
-                             ARGS.layer_names,
-                             ARGS.rule,
-                             ARGS.class_label,
-                             ARGS.output_dir)
+    compute_relevances_for_class(ARGS.data_path,
+                                 ARGS.data_name,
+                                 ARGS.dataset_name,
+                                 ARGS.partition,
+                                 ARGS.batch_size,
+                                 ARGS.model_path,
+                                 ARGS.model_name,
+                                 ARGS.layer_names,
+                                 ARGS.rule,
+                                 ARGS.class_label,
+                                 ARGS.relevance_datapath,
+                                 startidx=ARGS.start_index,
+                                 endidx=ARGS.end_index
+                                 )
 
-current, peak = tracemalloc.get_traced_memory()
-print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
-tracemalloc.stop()
-print("Relevance maps for x_data computed")
-print("Duration of relevance map computation:")
-print(time.process_time() - start)
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
+    tracemalloc.stop()
+    print("Relevance maps for x_data computed")
+    print("Duration of relevance map computation:")
+    print(time.process_time() - start)

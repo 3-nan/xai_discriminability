@@ -31,6 +31,27 @@ class TensorflowModel(ModelInterface):
         """ Evaluates the model on the given data. """
         return self.model.evaluate(data, labels)
 
+    def get_layer_names(self, with_weights_only=False):
+        """ Returns the layer names of the model. """
+
+        if with_weights_only:
+            layer_names = [layer.name for layer in self.model.layers if hasattr(layer, 'kernel_initializer')]
+
+        else:
+            layer_names = [layer.name for layer in self.model.layers]
+
+        return layer_names
+
+    def randomize_layer_weights(self, layer_name):
+        """ Randomizes the weights of the model in the choosen layer. """
+
+        layer = self.model.get_layer(name=layer_name)
+        weights = layer.get_weights()
+        weight_initializer = layer.kernel_initializer
+        self.model.get_layer(name=layer.name).set_weights([weight_initializer(shape=weights[0].shape), weights[1]])
+
+        return self
+
     def compute_relevance(self, batch, layer_names, neuron_selection, xai_method, additional_parameter=None):
         """ Compute relevance maps for the provided data batch. """
 

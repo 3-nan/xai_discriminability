@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import tracemalloc
 
-from ..dataloading.datasetinterface import get_dataloader
+from ..dataloading.custom import get_dataset
+from ..dataloading.dataloader import DataLoader
 from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import compute_relevance_path, join_path
 
@@ -20,7 +21,7 @@ def load_relevances(relevance_path, samples, labels):
     return np.array(relevances)
 
 
-def compute_pixelflipping_score(data_path, data_name, dataloader_name, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir):
+def compute_pixelflipping_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir):
     """ Estimate the pixelflipping score. """
 
     flip_percentages = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
@@ -29,20 +30,38 @@ def compute_pixelflipping_score(data_path, data_name, dataloader_name, relevance
     # init model
     model = init_model(model_path)
 
-    # initialize dataloader
-    dataloader = get_dataloader(dataloader_name)
-    dataloader = dataloader(datapath=data_path, partition=partition, batch_size=batch_size)
+    for classname in classes:
 
-    # preprocess data
-    test_data, test_labels = dataloader.preprocess_data(dataloader.samples, dataloader.labels)
+        # load dataset for this class
+
+        # estimate score for this class
+
+        # loop flip_percentages
+
+        # flip images
+
+        # compute score
+        break
+
+    # initialize dataset
+    dataset = get_dataset(dataset_name)
+    dataset = dataset(data_path, partition)
+    dataset.set_mode("preprocessed")
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, startidx=startidx, endidx=endidx)
 
     # estimate model score before flipping the pixels
-    pre_flip_score = model.evaluate(test_data, test_labels)
+    pre_flip_score = 0.0
+    num_batches = 0
+    for batch in dataloader:
+        pre_flip_score += model.evaluate([(sample.image, sample.one_hot_label) for sample in batch])
+        num_batches += 1
+    pre_flip_score /= num_batches
 
-
+    # TODO here it gets messy
     # get relevance maps
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
-    relevance_path = join_path(relevance_path, "val")
+    relevance_path = join_path(relevance_path, "val")compute_relevance_path
 
     relevances = load_relevances(relevance_path, dataloader.samples, dataloader.labels)
 
