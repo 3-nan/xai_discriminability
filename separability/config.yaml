@@ -11,7 +11,7 @@ data:
   datapath: /data/cluster/users/motzkus/data/VOC2012/
   dataname: voc2012
   datasetobject: VOC2012Dataset
-  partition: train  # might delete to enable simultaneous computation on train/val dataset
+  partition: val  # might delete to enable simultaneous computation on train/val dataset
   batchsize: 50
 
 model:
@@ -36,13 +36,13 @@ layers:
   - fc2
 
 xai_methods:
-  #- LRPZ
-  #- LRPAlpha1Beta0
+  - LRPZ
+  - LRPAlpha1Beta0
   #- LRPSequentialCompositeA
   - LRPSequentialCompositeBFlat
-  #- LRPGamma
-  #- Gradient
-  #- SmoothGrad
+  - LRPGamma
+  - Gradient
+  - SmoothGrad
 
 classes:
   - all

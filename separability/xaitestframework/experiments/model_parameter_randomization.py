@@ -13,7 +13,14 @@ from ..helpers.universal_helper import extract_filename, compute_relevance_path,
 
 
 # implement layer randomization
-def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir, output_dir, top_down=True, independent=False):
+def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir, output_dir,
+                        top_down=True, independent=False):
+
+    # configure save dir
+    if not os.path.exists(join_path(output_dir, "explanations")):
+        os.makedirs(join_path(output_dir, "explanations"))
+
+    output_dir = join_path(output_dir, "explanations")
 
     # get layers including weights and iterate them
     layer_names = model.get_layer_names(model, with_weights_only=True)
@@ -39,19 +46,20 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
             # labels = [sample.one_hot_label for sample in batch]
 
             if independent:
-                explanations = modelcp.compute_relevance(imgs, bottom_layer, neuron_selection=classidx, xai_method=xai_method, additional_parameter=None)
+                explanations = modelcp.compute_relevance(imgs, bottom_layer, neuron_selection=classidx,
+                                                         xai_method=xai_method, additional_parameter=None)
             else:
-                explanations = model.compute_relevance(imgs, bottom_layer, neuron_selection=classidx, xai_method=xai_method, additional_parameter=None)
+                explanations = model.compute_relevance(imgs, bottom_layer, neuron_selection=classidx,
+                                                       xai_method=xai_method, additional_parameter=None)
 
-            # save explanations
-            dirname = output_dir + "model_parameter_randomization"
+            # save explanations and compute diff to original explanation
 
             for i, explanation in enumerate(explanations[bottom_layer]):
 
-                np.save(dirname + extract_filename(batch[i].filename) + ".npy", explanation)
+                np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation)
 
                 # compute similarity
-                original_explanation = np.load(join_path(explanationdir, ["val", classidx]) + batch[i].filename + ".npy")
+                original_explanation = np.load(join_path(explanationdir, ["val", classidx, batch[i].filename]) + ".npy")
 
                 diff.append((np.square(original_explanation - explanation)).mean(axis=None))
 
@@ -75,7 +83,8 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
     df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + ".csv"), index=False)
 
 
-def model_parameter_randomization(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, bottom_layer, xai_method, explanationdir, output_dir):
+def model_parameter_randomization(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name,
+                                  bottom_layer, xai_method, explanationdir, output_dir):
     """ Function to create explanations on randomized models. """
 
     # init model
@@ -108,21 +117,24 @@ def model_parameter_randomization(data_path, data_name, dataset_name, partition,
         class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                             explanationdir, case_output_dir, top_down=True)
         # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results, case_output_dir)
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
 
         # CASE 2: cascading layer randomization bottom-up
         case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_bottom_up"])
         class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                             explanationdir, case_output_dir, top_down=False)
         # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results, case_output_dir)
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
 
         # CASE 3: independent layer randomization
         case_output_dir = join_path(output_dir, ["model_parameter_randomization", "independent"])
         class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                             explanationdir, case_output_dir, top_down=False, independent=True)
         # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results, case_output_dir)
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
 
 
 if __name__ == "__main__":
@@ -175,117 +187,4 @@ if __name__ == "__main__":
     print("Model Parameter randomization done")
     print("Duration of score computation:")
     print(time.process_time() - start)
-
-# # CASE 1: cascading randomization
-# def cascading_layer_randomization(model, analyzer, bottom_layer, x_test, y_test, output_dir, top_down=True):
-#     # iterate layers
-#     layer_gen = [layer for layer in model.layers if hasattr(layer, 'kernel_initializer')]
-#
-#     if top_down:
-#         layer_gen = layer_gen[::-1]
-#
-#     for layer in layer_gen:
-#         # randomize layer weights
-#         weights = layer.get_weights()
-#         weight_initializer = layer.kernel_initializer
-#         model.get_layer(name=layer.name).set_weights(
-#             [weight_initializer(shape=weights[0].shape), weights[1]])
-#
-#         # get analyzer
-#         ana = analyzer(model)
-#
-#         # compute relevance maps
-#         rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=[bottom_layer])
-#
-#         rmaps = np.array(rmaps[ARGS.layer])
-#
-#         if not top_down:
-#             if not os.path.exists(output_dir + "bottom_up/"):
-#                 os.makedirs(output_dir + "bottom_up/")
-#             np.save(output_dir + "bottom_up/" + layer.name + ".npy", rmaps)
-#
-#         else:
-#             np.save(output_dir + layer.name + ".npy", rmaps)
-#
-#
-# # CASE 2: independent randomization
-# def independent_layer_randomization(model, analyzer, bottom_layer, x_test, y_test, output_dir):
-#     # iterate layers
-#     layer_gen = (layer for layer in model.layers if hasattr(layer, 'kernel_initializer'))
-#
-#     for layer in layer_gen:
-#         cloned_model = tf.keras.models.clone_model(model)
-#         # randomize layer weights
-#         weights = layer.get_weights()
-#         weight_initializer = layer.kernel_initializer
-#         cloned_model.get_layer(name=layer.name).set_weights(
-#             [weight_initializer(shape=weights[0].shape), weights[1]])
-#
-#         # get analyzer
-#         ana = analyzer(cloned_model)
-#
-#         # compute relevance maps
-#         rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=[bottom_layer])
-#
-#         rmaps = np.array(rmaps[ARGS.layer])
-#
-#         np.save(output_dir + layer.name + ".npy", rmaps)
-#
-#
-# # MAIN FUNCTION
-# dataloader = DataLoader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
-# data = dataloader.get_data("val", shuffle=True, seed=42)
-# datapartition = data.take(1)
-# x_test = []
-# y_test = []
-# for dp in datapartition.as_numpy_iterator():
-#     x_test.append(np.array(dp[0]))
-#     y_test.append(np.array(dp[1]))
-#
-# x_test = np.array(x_test)[0]
-# y_test = np.array(y_test)[0]
-#
-# y_test = np.argmax(y_test, axis=1)
-# print(y_test.shape)
-# print(x_test.shape)
-#
-# # make output dirs
-# output_dir = ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "_" + ARGS.rule
-# if not os.path.exists(output_dir):
-#     os.makedirs(output_dir)
-#     os.makedirs(output_dir + "/" + "cascading")
-#     os.makedirs(output_dir + "/" + "independent")
-#
-# np.save(output_dir + "/" + "original" + ".npy", np.array(x_test))
-#
-# # load model
-# if ARGS.model_path:
-#     # load model
-#     print(ARGS.model_path)
-#     model = tf.keras.models.load_model(ARGS.model_path)
-# else:
-#     # optionally add training sequence here??
-#     print("No model path given! Please add with -m model_path")
-#
-#
-# # preprocess model
-# model = innvestigate.utils.keras.graph.model_wo_softmax(model)
-#
-# # get analyzer
-# analyzer = parse_xai_method(ARGS.rule)
-#
-# # get analyzer and compute normal relevance maps
-# ana = analyzer(model)
-#
-# # compute relevance maps
-# rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=[ARGS.layer])
-# rmaps = np.array(rmaps[ARGS.layer])
-#
-# np.save(output_dir + "/" + "not_randomized" + ".npy", rmaps)
-#
-# print("cascading layer randomization")
-# cascading_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/cascading/")
-# print("cascading layer randomization bottom up")
-# cascading_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/cascading/", top_down=False)
-# print("independent layer randomization")
-# independent_layer_randomization(model, analyzer, ARGS.layer, x_test, y_test, output_dir + "/independent/")
+    print("Job executed successfully.")

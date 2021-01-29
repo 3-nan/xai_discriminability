@@ -28,7 +28,7 @@ def get_relevance_dir_path(output_dir, data_name, model_name, layer, rule, parti
 
 
 def compute_relevances_for_class(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
-    """ Function to compute the attributed relevances for the selected class. """
+    """ Wrapper Function to compute the attributed relevances for the selected class. """
 
     print("compute explanations for layer(s): {}".format(layer_names))
 
@@ -38,6 +38,13 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
     # initialize dataset
     dataset = get_dataset(dataset_name)
     dataset = dataset(data_path, partition)
+    compute_explanations_for_class(data_name, dataset, partition, batch_size, model, model_name, layer_names,
+                                   xai_method, class_name, output_dir, startidx=startidx, endidx=endidx)
+
+
+def compute_explanations_for_class(data_name, dataset, partition, batch_size, model, model_name, layer_names,
+                                   xai_method, class_name, output_dir, startidx=0, endidx=0):
+    """ Computes the explanations for the selected class and saves them to output dir. """
     dataset.set_mode("preprocessed")
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, startidx=startidx, endidx=endidx)
@@ -51,7 +58,8 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
         R = model.compute_relevance(imgs, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
 
         for layer_name in layer_names:
-            layer_output_dir = get_relevance_dir_path(output_dir, data_name, model_name, layer_name, xai_method, partition, class_name)
+            layer_output_dir = get_relevance_dir_path(output_dir, data_name, model_name, layer_name, xai_method,
+                                                      partition, class_name)
             for r, relevance in enumerate(R[layer_name]):
                 fname = extract_filename(batch[r].filename)
                 filename = layer_output_dir + "/" + fname + ".npy"
@@ -119,3 +127,4 @@ if __name__ == "__main__":
     print("Relevance maps for x_data computed")
     print("Duration of relevance map computation:")
     print(time.process_time() - start)
+    print("Job executed successfully.")

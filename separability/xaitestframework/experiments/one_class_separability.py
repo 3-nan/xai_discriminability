@@ -2,14 +2,58 @@ import argparse
 import datetime
 import time
 import os
+import random
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
 import tracemalloc
 
 from ..dataloading.custom import get_dataset
-# from ..dataloading.dataloader import DataLoader
+from ..dataloading.dataloader import DataLoader
 from ..helpers.universal_helper import extract_filename, join_path, compute_relevance_path
+
+
+def load_explanations(explanationdir, samples, classidx):
+    """ Load explanations for the given classidx. """
+
+    explanations = []
+
+    if isinstance(classidx, list):
+        for sample in samples:
+            explanations.append(np.load(join_path(explanationdir, [str(classidx), sample.filename]) + ".npy"))
+    else:
+        for s, sample in enumerate(samples):
+            explanations.append(np.load(join_path(explanationdir, [str(classidx[s]), sample.filename]) + ".npy"))
+
+    return np.array(explanations)
+
+
+def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir):
+    """ Load data for the svm classification. """
+
+    data = []
+    labels = []
+
+    for batch in dataloader:
+        filenames = [sample.filename for sample in batch]
+
+        # target explanations
+        explanations = load_explanations(explanationdir, batch, classidx=classidx)
+
+        data.append(explanations)
+        labels.append(np.ones(len(explanations)))
+
+        # non-target explanations
+        target_classes = random.sample(classes, len(batch))
+        explanations = load_explanations(explanationdir, batch, classidx=target_classes)
+
+        data.append(explanations)
+        labels.append(np.zeros(len(explanations)))
+
+    data = np.concatenate(data)
+    labels = np.concatenate(labels)
+
+    return data, labels
 
 
 def load_relevance_map_selection(data_path, partition, label, filenames):
@@ -56,27 +100,26 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
 
     # initialize dataset
-    dataset = get_dataset(dataset_name)
-    dataset = dataset(data_path, "train")
+    datasetclass = get_dataset(dataset_name)
+    dataset = datasetclass(data_path, "train")
     dataset.set_mode("raw")
 
-    # initialize testset
-    testset = get_dataset(dataset_name)
-    testset = testset(data_path, "val")
-    testset.set_mode("raw")
+    class_indices = [str(dataset.classname_to_idx(name)) for name in dataset.classes]
 
     # iterate classes
-    for classlabel in dataset.classes:
-        print("estimate one class separability for class " + str(classlabel))
+    for classidx in class_indices:
 
-        # get indices of datapoints relating classlabel
-        filenames = []
-        for i, sample in enumerate(dataset):
-            if classlabel in sample.label:
-                filenames.append(extract_filename(sample.filename))
+        print("estimate one class separability for class " + classidx)
+
+        # load dataset for this class
+        class_data = datasetclass(data_path, partition, classidx=classidx)
+        class_data.set_mode("raw")
+
+        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, startidx=0, endidx=1000)
 
         # load relevance maps from train partition to train clf
-        Rc_data, labels = load_relevance_map_selection(relevance_path, 'train', dataset.classname_to_idx(classlabel), filenames)
+        Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
+                                                        join_path(relevance_path, "train"))
 
         print(Rc_data.shape)
         print(labels.shape)
