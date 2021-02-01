@@ -1,1 +1,0 @@
--dn cifar10 -o /data/cluster/users/motzkus/relevance_maps -m /data/cluster/users/motzkus/models/vgg16_cifar10/model/ -mn vgg16 -si 0 -ei 200 -p train -cl 0 -r LRPSequentialCompositeA -l conv2d -bs 50

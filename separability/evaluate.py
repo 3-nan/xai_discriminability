@@ -6,6 +6,7 @@ import subprocess
 
 from xaitestframework.experiments.relevance_computation import compute_relevances_for_class
 from xaitestframework.dataloading.custom import get_dataset
+from xaitestframework.helpers.universal_helper import join_path
 
 
 def submit_on_sungrid(args, configs, quantification_method, index):
@@ -129,13 +130,15 @@ def evaluate(filepath):
         base_args += " -bs " + str(batchsize)
 
         base_args += " -rd " + explanationdir
-        base_args += " -o " + outputdir + "separability/"
+        # base_args += " -o " + outputdir  # + "separability/"
 
         base_args += " -m " + modelpath
         base_args += " -mn " + modelname
 
         # add quantification specific arguments
         if quantifications[0] == "relevance_computation":
+
+            # base_args += " -o " + join_path(outputdir, "separability")
 
             dataset = get_dataset(dataset)
             dataset = dataset(datapath, partition)
@@ -166,6 +169,41 @@ def evaluate(filepath):
 
                     elif backend == "ubuntu":
                         submit_on_ubuntu(configs['data'], configs['model'], configs['layers'], xai_method, label_idx, job_index, explanationdir)
+                        job_index += 1
+
+        else:
+            for quantification_dict in quantifications:
+
+                quantification = list(quantification_dict.keys())[0]
+                print(quantification)
+
+                method_output_dir = join_path(outputdir, quantification)
+                method_args = base_args + " -o " + method_output_dir
+
+                if not os.path.isdir(method_output_dir):
+                    print('Creating {}'.format(method_output_dir))
+                    os.makedirs(method_output_dir)
+
+                job_index = 0
+                for xai_method in xai_methods:
+                    job_args = method_args + " -r " + xai_method
+
+                    if quantification in ["pixelflipping"]:
+
+                        job_args = job_args + " -l " + layers[0]
+                        job_args = job_args + " -pd " + quantification_dict[quantification]["distribution"]
+
+                    elif quantification in ["model_parameter_randomization"]:
+
+                        job_args = job_args + " -l " + layers[0]
+
+                    elif quantification in ["one_class_separability"]:
+
+                        job_args = job_args + " -l " + ":".join(layers)
+
+                    # submit
+                    if backend == "sge":
+                        submit_on_sungrid(job_args, configs, quantification, job_index)
                         job_index += 1
 
 

@@ -91,8 +91,8 @@ def model_parameter_randomization(data_path, data_name, dataset_name, partition,
     model = init_model(model_path)
 
     # initialize dataset
-    dataset = get_dataset(dataset_name)
-    dataset = dataset(data_path, partition)
+    dataset_class = get_dataset(dataset_name)
+    dataset = dataset_class(data_path, partition)
 
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
 
@@ -104,11 +104,15 @@ def model_parameter_randomization(data_path, data_name, dataset_name, partition,
         os.makedirs(join_path(output_dir, "model_parameter_randomization/independent"))
 
     # iterate classes of the dataset
-    for classidx in dataset.classes:
+    for classname in dataset.classes:
 
-        class_data = get_dataset(dataset_name)
-        class_data = class_data(data_path, partition, classidx=[classidx])
+        classidx = dataset.classname_to_idx(classname)
+        print("iteration for class index {}".format(classidx))
+
+        class_data = dataset_class(data_path, partition, classidx=[classidx])
         class_data = class_data.set_mode("preprocessed")
+
+        print(type(class_data))
 
         dataloader = DataLoader(class_data, batch_size=batch_size)
 

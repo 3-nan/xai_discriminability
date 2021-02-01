@@ -31,6 +31,10 @@ class TensorflowModel(ModelInterface):
         """ Evaluates the model on the given data. """
         return self.model.evaluate(data, labels)
 
+    def predict(self, data, batch_size=None):
+        """ Compute predictions for the given data. """
+        return self.model.predict(data, batch_size=batch_size)
+
     def get_layer_names(self, with_weights_only=False):
         """ Returns the layer names of the model. """
 

@@ -119,7 +119,7 @@ class VOC2012Dataset(Dataset):
         else:
             self.classes = []
             for idx in classidx:
-                self.classes.append(self.cmap[idx])
+                self.classes.append(self.cmap[int(idx)])
 
         self.labels = []
 
@@ -128,11 +128,11 @@ class VOC2012Dataset(Dataset):
         else:
             f = []
             for idx in classidx:
-                classfile = open(datapath + "ImageSets/Main/" + self.cmap[idx] + "_" + partition + ".txt", "r")
-                for line in classfile:
-                    filename, in_class = line.split(" ")
-                    if in_class == 1 and (filename not in f):
-                        f.append(filename)
+                with open(datapath + "ImageSets/Main/" + self.cmap[int(idx)] + "_" + partition + ".txt", "r") as classfile:
+                    for line in classfile:
+                        filename, in_class = [value for value in line.split(" ") if value]
+                        if in_class.startswith("1") and (filename not in f):
+                            f.append(filename)
 
         for line in f:
             if line.endswith("\n"):
