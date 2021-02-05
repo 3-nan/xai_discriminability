@@ -4,7 +4,6 @@ system_config:
   backend: sge # ubuntu
   conda: conda
   environment: separability
-  memory_per_job: 5G
   threads: 5
 
 data:
@@ -20,8 +19,8 @@ model:
   modeltype: tensorflow
 
 dirs:
-  logdir: logs-testing/
-  scriptdir: scripts-testing/
+  logdir: logs-debug/
+  scriptdir: scripts-debug/
   explanationdir: /data/cluster/users/motzkus/relevance_maps
   outputdir: /data/cluster/users/motzkus/results
 
@@ -37,18 +36,27 @@ layers:
 
 xai_methods:
   - LRPZ
-  #- LRPAlpha1Beta0
-  #- LRPSequentialCompositeA
-  #- LRPSequentialCompositeBFlat
-  #- LRPGamma
-  #- Gradient
+  - LRPAlpha1Beta0
+  - LRPSequentialCompositeA
+  - LRPSequentialCompositeBFlat
+  - LRPGamma
+  - Gradient
   #- SmoothGrad
 
 classes:
   - all
 
 quantifications:
-  #- pixelflipping:
-  #    distribution: "uniform"   # "uniform", "gaussian"
+#  - pixelflipping:
+#      args:
+#          distribution: uniform   # uniform, gaussian
+#      config:
+#          memory_per_job: 5G
   - model_parameter_randomization:
-  - one_class_separability:
+      args:
+      config:
+          memory_per_job: 20G
+#  - one_class_separability:
+#      args:
+#      config:
+#          memory_per_job: 5G

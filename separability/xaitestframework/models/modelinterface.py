@@ -3,8 +3,9 @@ from abc import ABC, abstractmethod
 
 class ModelInterface(ABC):
 
-    def __init__(self):
+    def __init__(self, modelpath):
         """ Initialize the model. """
+        self.path = modelpath
         super().__init__()
 
     @abstractmethod

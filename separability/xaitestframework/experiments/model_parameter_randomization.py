@@ -23,7 +23,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
     output_dir = join_path(output_dir, "explanations")
 
     # get layers including weights and iterate them
-    layer_names = model.get_layer_names(model, with_weights_only=True)
+    layer_names = model.get_layer_names(with_weights_only=True)
 
     if top_down:
         layer_names = layer_names[::-1]
@@ -35,31 +35,26 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
         diff = []
         # randomize layer weights
         if independent:
-            modelcp = copy.deepcopy(model)
-            modelcp = modelcp.randomize_layer_weights(layer_name)
-        else:
-            model = model.randomize_layer_weights(layer_name)
+            model = init_model(model.path)
+
+        model = model.randomize_layer_weights(layer_name)
 
         # iterate data and compute explanations
         for batch in dataloader:
             imgs = [sample.image for sample in batch]
             # labels = [sample.one_hot_label for sample in batch]
 
-            if independent:
-                explanations = modelcp.compute_relevance(imgs, bottom_layer, neuron_selection=classidx,
-                                                         xai_method=xai_method, additional_parameter=None)
-            else:
-                explanations = model.compute_relevance(imgs, bottom_layer, neuron_selection=classidx,
-                                                       xai_method=xai_method, additional_parameter=None)
+            explanations = model.compute_relevance(imgs, [bottom_layer], neuron_selection=int(classidx),
+                                                   xai_method=xai_method, additional_parameter=None)
 
             # save explanations and compute diff to original explanation
 
             for i, explanation in enumerate(explanations[bottom_layer]):
 
-                np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation)
+                # np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation) # ToDo: save some explanations
 
                 # compute similarity
-                original_explanation = np.load(join_path(explanationdir, ["val", classidx, batch[i].filename]) + ".npy")
+                original_explanation = np.load(join_path(explanationdir, ["val", str(classidx), extract_filename(batch[i].filename)]) + ".npy")
 
                 diff.append((np.square(original_explanation - explanation)).mean(axis=None))
 
@@ -80,68 +75,69 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
     df = pd.DataFrame(results,
                       columns=['dataset', 'model', 'method', 'classindex', 'layer', 'score'])
-    df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + ".csv"), index=False)
+    df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + "_" + classidx + ".csv"),
+              index=False)
 
 
-def model_parameter_randomization(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name,
+def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size, model_path, model_name,
                                   bottom_layer, xai_method, explanationdir, output_dir):
     """ Function to create explanations on randomized models. """
 
     # init model
     model = init_model(model_path)
 
-    # initialize dataset
-    dataset_class = get_dataset(dataset_name)
-    dataset = dataset_class(data_path, partition)
-
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
 
     # configure directories
-    if not os.path.exists(output_dir + "/" + "model_parameter_randomization"):
-        os.makedirs(join_path(output_dir, "model_parameter_randomization"))
-        os.makedirs(join_path(output_dir, "model_parameter_randomization/cascading_top_down"))
-        os.makedirs(join_path(output_dir, "model_parameter_randomization/cascading_bottom_up"))
-        os.makedirs(join_path(output_dir, "model_parameter_randomization/independent"))
+    if not os.path.exists(join_path(output_dir, "cascading_top_down")):
+        os.makedirs(join_path(output_dir, "cascading_top_down"))
+        os.makedirs(join_path(output_dir, "cascading_bottom_up"))
+        os.makedirs(join_path(output_dir, "independent"))
 
-    # iterate classes of the dataset
-    for classname in dataset.classes:
+    print("iteration for class index {}".format(classidx))
 
-        classidx = dataset.classname_to_idx(classname)
-        print("iteration for class index {}".format(classidx))
+    # initialize dataset
+    datasetclass = get_dataset(dataset_name)
+    class_data = datasetclass(data_path, partition, classidx=[classidx])
+    class_data.set_mode("preprocessed")
 
-        class_data = dataset_class(data_path, partition, classidx=[classidx])
-        class_data = class_data.set_mode("preprocessed")
+    print(type(class_data))
 
-        print(type(class_data))
+    dataloader = DataLoader(class_data, batch_size=batch_size)
 
-        dataloader = DataLoader(class_data, batch_size=batch_size)
+    # CASE 1: cascading layer randomization top-down
+    print("case 1: cascading layer randomization top-down")
+    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_top_down"])
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
+                                        explanationdir, case_output_dir, top_down=True)
+    # save results
+    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                           case_output_dir)
 
-        # CASE 1: cascading layer randomization top-down
-        case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_top_down"])
-        class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                            explanationdir, case_output_dir, top_down=True)
-        # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                               case_output_dir)
+    # CASE 2: cascading layer randomization bottom-up
+    print("case 2: cascading layer randomization bottom-up")
+    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_bottom_up"])
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
+                                        explanationdir, case_output_dir, top_down=False)
+    # save results
+    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                           case_output_dir)
 
-        # CASE 2: cascading layer randomization bottom-up
-        case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_bottom_up"])
-        class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                            explanationdir, case_output_dir, top_down=False)
-        # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                               case_output_dir)
-
-        # CASE 3: independent layer randomization
-        case_output_dir = join_path(output_dir, ["model_parameter_randomization", "independent"])
-        class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                            explanationdir, case_output_dir, top_down=False, independent=True)
-        # save results
-        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                               case_output_dir)
+    # CASE 3: independent layer randomization
+    print("case 3: independent layer randomization")
+    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "independent"])
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
+                                        explanationdir, case_output_dir, top_down=False, independent=True)
+    # save results
+    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                           case_output_dir)
 
 
 if __name__ == "__main__":
+
+    def decode_layernames(string):
+        """ Decodes the layer_names string to a list of strings. """
+        return string.split(":")
 
     print("model parameter randomization")
     # Setting up an argument parser for command line calls
@@ -159,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
     parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-    parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
+    parser.add_argument("-l", "--layer", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
 
     ARGS = parser.parse_args()
@@ -175,11 +171,12 @@ if __name__ == "__main__":
     model_parameter_randomization(ARGS.data_path,
                                   ARGS.data_name,
                                   ARGS.dataset_name,
+                                  ARGS.class_label,
                                   ARGS.partition,
                                   ARGS.batch_size,
                                   ARGS.model_path,
                                   ARGS.model_name,
-                                  ARGS.layer,
+                                  ARGS.layer[0],
                                   ARGS.rule,
                                   ARGS.relevance_datapath,
                                   ARGS.output_dir

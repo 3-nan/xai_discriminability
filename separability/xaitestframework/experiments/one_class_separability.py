@@ -19,17 +19,20 @@ def load_explanations(explanationdir, samples, classidx):
     explanations = []
 
     if isinstance(classidx, list):
-        for sample in samples:
-            explanations.append(np.load(join_path(explanationdir, [str(classidx), extract_filename(sample.filename)]) + ".npy"))
-    else:
         for s, sample in enumerate(samples):
             explanations.append(np.load(join_path(explanationdir, [str(classidx[s]), extract_filename(sample.filename)]) + ".npy"))
+    else:
+        for s, sample in enumerate(samples):
+            explanations.append(np.load(join_path(explanationdir, [str(classidx), extract_filename(sample.filename)]) + ".npy"))
 
-    return np.array(explanations)
+    return np.mean(np.array(explanations), axis=3)
 
 
 def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir):
     """ Load data for the svm classification. """
+
+    if classidx in classes:
+        classes.remove(classidx)
 
     data = []
     labels = []
@@ -43,12 +46,14 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
         data.append(explanations)
         labels.append(np.ones(len(explanations)))
 
-        # non-target explanations
-        target_classes = random.sample(classes, len(batch))
-        explanations = load_explanations(explanationdir, batch, classidx=target_classes)
+        # repeat
+        for r in range(5):
+            # non-target explanations
+            selected_classes = [random.choice(classes) for i in range(len(batch))]
+            explanations = load_explanations(explanationdir, batch, classidx=selected_classes)
 
-        data.append(explanations)
-        labels.append(np.zeros(len(explanations)))
+            data.append(explanations)
+            labels.append(np.zeros(len(explanations)))
 
     print("shape of the data loaded for testing is")
     print(np.array(data).shape)
@@ -58,46 +63,46 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     return data, labels
 
 
-def load_relevance_map_selection(data_path, partition, label, filenames):
-    """ Load a selection of relevance maps
-    label: int - class label to get data for
-    """
-    rmaps = []
-    labels = []
-
-    for dir in os.scandir(join_path(data_path, partition)):
-
-        R_c = []
-
-        for filename in filenames:
-            R_c.append(np.load(join_path(dir.path, filename) + ".npy"))
-
-        # R_c = np.append(R_c)
-
-        rmaps.append(R_c)
-
-        # add labels for correct / incorrect class to labels
-        if dir.name == str(label):
-            # append true to labels
-            labels.append(np.ones(len(filenames)))
-        else:
-            # append false to labels
-            labels.append(np.zeros(len(filenames)))
-
-    rmaps = np.concatenate(rmaps)
-    labels = np.concatenate(labels)
-
-    print(rmaps.shape)
-    print(labels.shape)
-
-    # shuffle files
-    p = np.random.permutation(len(labels))
-
-    return rmaps[p], labels[p]
+# def load_relevance_map_selection(data_path, partition, label, filenames):
+#     """ Load a selection of relevance maps
+#     label: int - class label to get data for
+#     """
+#     rmaps = []
+#     labels = []
+#
+#     for dir in os.scandir(join_path(data_path, partition)):
+#
+#         R_c = []
+#
+#         for filename in filenames:
+#             R_c.append(np.load(join_path(dir.path, filename) + ".npy"))
+#
+#         rmaps.append(R_c)
+#
+#         # add labels for correct / incorrect class to labels
+#         if dir.name == str(label):
+#             # append true to labels
+#             labels.append(np.ones(len(filenames)))
+#         else:
+#             # append false to labels
+#             labels.append(np.zeros(len(filenames)))
+#
+#     rmaps = np.concatenate(rmaps)
+#     labels = np.concatenate(labels)
+#
+#     print(rmaps.shape)
+#     print(labels.shape)
+#
+#     # shuffle files
+#     p = np.random.permutation(len(labels))
+#
+#     return rmaps[p], labels[p]
 
 
-def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
+def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_names, rule, output_dir):
     """ Compute the separability score for the provided relevances. """
+
+    layer_name = layer_names[0]     # TODO: iterate layers
 
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
 
@@ -114,7 +119,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         print("estimate one class separability for class " + classidx)
 
         # load dataset for this class
-        class_data = datasetclass(data_path, "train", classidx=classidx)
+        class_data = datasetclass(data_path, "train", classidx=[classidx])
         class_data.set_mode("raw")
 
         dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, startidx=0, endidx=1000)
@@ -126,14 +131,16 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         print(Rc_data.shape)
         print(labels.shape)
 
-        if len(Rc_data.shape) == 4:
+        if len(Rc_data.shape) == 3:
+            Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2]))
+        elif len(Rc_data.shape) == 4:
             Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
 
         clf = LinearSVC()
         clf.fit(Rc_data, labels)
 
         # load test data
-        test_data = datasetclass(data_path, "val", classidx=classidx)
+        test_data = datasetclass(data_path, "val", classidx=[classidx])
         test_data.set_mode("raw")
 
         testloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
@@ -141,7 +148,11 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         Rc_test, test_labels = load_explanation_data_for_svc(testloader, classidx, class_indices,
                                                              join_path(relevance_path, "val"))
 
-        if len(Rc_test.shape) == 4:
+        print(Rc_test.shape)
+
+        if len(Rc_test.shape) == 3:
+            Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2]))
+        elif len(Rc_test.shape) == 4:
             Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
 
         # compute score
@@ -150,13 +161,14 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         print("separability score for class " + str(classidx))
         print(score)
 
-        if not os.path.exists(output_dir + data_name + "_" + model_name):
-            os.makedirs(output_dir + data_name + "_" + model_name)
+        resultdir = join_path(output_dir, data_name + "_" + model_name)
+
+        if not os.path.exists(resultdir):
+            os.makedirs(resultdir)
 
         df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
                           columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
-        df.to_csv(output_dir + data_name + "_" + model_name + "/" + layer_name + "_" + rule + "_"
-                  + classidx + ".csv", index=False)
+        df.to_csv(resultdir + "/" + layer_name + "_" + rule + "_" + classidx + ".csv", index=False)
 
 
 if __name__ == "__main__":
@@ -164,6 +176,10 @@ if __name__ == "__main__":
     print(current_datetime)
 
     print("one_class_separability")
+
+    def decode_layernames(string):
+        """ Decodes the layer_names string to a list of strings. """
+        return string.split(":")
 
     # Setting up an argument parser for command line calls
     parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
@@ -180,7 +196,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
     parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-    parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
+    parser.add_argument("-l", "--layer", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
 
     ARGS = parser.parse_args()

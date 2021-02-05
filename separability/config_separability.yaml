@@ -19,20 +19,20 @@ model:
   modeltype: tensorflow
 
 dirs:
-  logdir: logs-pixelflipping/
-  scriptdir: scripts-pixelflipping/
+  logdir: logs-separability/
+  scriptdir: scripts-separability/
   explanationdir: /data/cluster/users/motzkus/relevance_maps
   outputdir: /data/cluster/users/motzkus/results
 
 layers:
   - input_1
-  #- block1_conv1
-  #- block2_conv1
-  #- block3_conv1
-  #- block4_conv1
-  #- block5_conv1
-  #- fc1
-  #- fc2
+  - block1_conv1
+  - block2_conv1
+  - block3_conv1
+  - block4_conv1
+  - block5_conv1
+  - fc1
+  - fc2
 
 xai_methods:
   - LRPZ
@@ -47,16 +47,16 @@ classes:
   - all
 
 quantifications:
-  - pixelflipping:
-      args:
-          distribution: uniform   # uniform, gaussian
-      config:
-          memory_per_job: 5G
+#  - pixelflipping:
+#      args:
+#          distribution: uniform   # uniform, gaussian
+#      config:
+#          memory_per_job: 5G
 #  - model_parameter_randomization:
 #      args:
 #      config:
 #          memory_per_job: 15G
-#  - one_class_separability:
-#      args:
-#      config:
-#          memory_per_job: 5G
+  - one_class_separability:
+      args:
+      config:
+          memory_per_job: 5G

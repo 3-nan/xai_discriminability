@@ -23,11 +23,14 @@ def load_explanations(explanationdir, samples, classidx):
     return np.array(explanations)
 
 
-def compute_pixelflipping_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir):
+def compute_pixelflipping_score(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir):
     """ Estimate the pixelflipping score. """
 
-    flip_percentages = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
-                        0.9]
+    print("compute score for classidx {}".format(classidx))
+    # flip_percentages = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
+    #                     0.9]
+
+    flip_percentages = [0.0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5]
 
     # construct explanationpath
     explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
@@ -36,84 +39,82 @@ def compute_pixelflipping_score(data_path, data_name, dataset_name, relevance_pa
     # init model
     model = init_model(model_path)
 
-    # load dataset
+    # prep result structure
+    class_score = {}
+    for percentage in flip_percentages:
+        class_score[percentage] = []
+
+    # load dataset for this class
     datasetclass = get_dataset(dataset_name)
-    dataset = datasetclass(data_path, partition)
+    class_data = datasetclass(data_path, partition, classidx=[classidx])
+    class_data.set_mode("preprocessed")
 
-    for classname in dataset.classes:
+    dataloader = DataLoader(class_data, batch_size=batch_size)
 
-        classidx = dataset.classname_to_idx(classname)
+    # iterate data
+    for batch in dataloader:
 
-        # prep result structure
-        class_score = {}
+        data = [sample.image for sample in batch]
+
+        # get/sort indices for pixelflipping order
+        explanations = load_explanations(explanationdir, batch, classidx)
+        # reduce explanations dimension
+        explanations = np.max(explanations, axis=3)
+
+        print(explanations.shape)
+
+        if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
+            indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
+        else:
+            indices = [np.argsort(explanation, axis=None) for explanation in explanations]
+
+        indices = np.array(indices)
+
+        print(indices.shape)
+
+        # loop flip_percentages
         for percentage in flip_percentages:
-            class_score[percentage] = []
 
-        # load dataset for this class
-        class_data = datasetclass(data_path, partition, classidx=classidx)
-        class_data.set_mode("preprocessed")
+            # get first percentage part of pixel indices (lowest relevance)
+            # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
+            # get last percentage part of pixel indices (highest relevance)
+            indicesfraction = indices[:, int((1 - percentage) * indices.shape[1]):]
+            print(indicesfraction.shape)
 
-        dataloader = DataLoader(class_data, batch_size=batch_size)
+            flipped_data = []
 
-        # iterate data
-        for batch in dataloader:
+            # flip images
+            for p, point in enumerate(data):
+                # flip pixels
+                for axis in range(point.shape[2]):
+                    if distribution == "uniform":
+                        random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
+                    elif distribution == "gaussian":
+                        random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
+                    else:
+                        raise ValueError("No distribution for flipping pixels specified.")
+                    np.put_along_axis(point[:, :, axis], indicesfraction[p], random_values, axis=None)
 
-            data = [sample.image for sample in batch]
+                flipped_data.append(point)
 
-            # get/sort indices for pixelflipping order
-            explanations = load_explanations(explanationdir, batch, classidx)
-            # reduce explanations dimension
-            explanations = np.max(explanations, axis=3)
+            flipped_data = np.array(flipped_data)
 
-            print(explanations.shape)
+            # compute score on flipped data
+            # predictions = model.predict(flipped_data, batch_size=len(flipped_data))
+            predictions = model.predict(flipped_data, batch_size=len(flipped_data))
+            # print(predictions)
+            # print(predictions.shape)
+            # print(predictions[:, classidx])
 
-            if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
-                indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
-            else:
-                indices = [np.argsort(explanation, axis=None) for explanation in explanations]
+            class_score[percentage].append(predictions[:, classidx])
 
-            indices = np.array(indices)
+    # collect results and write to file
+    results = []
+    for key in class_score:
+        results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
 
-            print(indices.shape)
-
-            # loop flip_percentages
-            for percentage in flip_percentages:
-
-                # get first percentage part of pixel indices (lowest relevance)
-                # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
-                # get last percentage part of pixel indices (highest relevance)
-                indicesfraction = indices[:, int((1 - percentage) * len(indices)):]
-
-                flipped_data = []
-
-                # flip images
-                for p, point in enumerate(data):
-                    # flip pixels
-                    for axis in range(point.shape[2]):
-                        if distribution == "uniform":
-                            random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
-                        elif distribution == "gaussian":
-                            random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
-                        else:
-                            raise ValueError("No distribution for flipping pixels specified.")
-                        np.put_along_axis(point[:, :, axis], indicesfraction[p], random_values, axis=None)
-
-                    flipped_data.append(point)
-
-                flipped_data = np.array(flipped_data)
-
-                # compute score on flipped data
-                predictions = model.predict(flipped_data, batch_size=len(flipped_data))
-
-                class_score[percentage].append(predictions[:, classidx])
-
-        # collect results and write to file
-        results = []
-        for key in class_score:
-            results.append([data_name, model_name, rule, str(key), str(np.mean(class_score[key]))])
-
-        df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
-        df.to_csv(output_dir + data_name + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv", index=False)
+    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
+    df.to_csv(join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv", index=False)
 
 
 if __name__ == "__main__":
@@ -149,6 +150,7 @@ if __name__ == "__main__":
     compute_pixelflipping_score(ARGS.data_path,
                                 ARGS.data_name,
                                 ARGS.dataloader_name,
+                                ARGS.class_label,
                                 ARGS.relevance_datapath,
                                 ARGS.partition,
                                 ARGS.batch_size,

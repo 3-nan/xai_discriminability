@@ -83,11 +83,11 @@ def plot_model_parameter_randomization_example(modelpath, setup, dir, index, ind
     plt.show()
 
     if independent:
-        fig.savefig("plots/model_parameter_randomization/independent/" + setup + ".png")
+        fig.savefig("plots2020/model_parameter_randomization/independent/" + setup + ".png")
     elif bottom_up:
-        fig.savefig("plots/model_parameter_randomization/cascading_bottomup/" + setup + ".png")
+        fig.savefig("plots2020/model_parameter_randomization/cascading_bottomup/" + setup + ".png")
     else:
-        fig.savefig("plots/model_parameter_randomization/cascading/" + setup + ".png")
+        fig.savefig("plots2020/model_parameter_randomization/cascading/" + setup + ".png")
 
 
 modelpath = "../models/vgg16_imagenet/"

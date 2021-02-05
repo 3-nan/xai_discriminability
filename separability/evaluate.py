@@ -9,7 +9,7 @@ from xaitestframework.dataloading.custom import get_dataset
 from xaitestframework.helpers.universal_helper import join_path
 
 
-def submit_on_sungrid(args, configs, quantification_method, index):
+def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
     """ Submit the specified job on a sungrid engine. """
 
     print('Generating and submitting jobs for:')
@@ -41,7 +41,7 @@ def submit_on_sungrid(args, configs, quantification_method, index):
     cmd += ['-pe', 'multi', str(configs['system_config']['threads'])]
     cmd += ['-e', configs['dirs']['logdir']]
     cmd += ['-o', configs['dirs']['logdir']]
-    cmd += ['-l', 'h_vmem=' + configs['system_config']['memory_per_job']]
+    cmd += ['-l', 'h_vmem=' + jobconfig['memory_per_job']]
     cmd += [SCRIPTFILE]
     print('    preparing to submit via command: {}'.format(cmd))
 
@@ -135,18 +135,25 @@ def evaluate(filepath):
         base_args += " -m " + modelpath
         base_args += " -mn " + modelname
 
+        dataset = get_dataset(dataset)
+        dataset = dataset(datapath, partition)
+        print(len(dataset))
+
+        if classes[0] == "all":
+            classes = dataset.classes
+
         # add quantification specific arguments
         if quantifications[0] == "relevance_computation":
 
             # base_args += " -o " + join_path(outputdir, "separability")
 
-            dataset = get_dataset(dataset)
-            dataset = dataset(datapath, partition)
-
-            print(len(dataset))
-
-            if classes[0] == "all":
-                classes = dataset.classes
+            # dataset = get_dataset(dataset)
+            # dataset = dataset(datapath, partition)
+            #
+            # print(len(dataset))
+            #
+            # if classes[0] == "all":
+            #     classes = dataset.classes
 
             job_size = 1000  # number of images to process per job
             job_index = 0
@@ -156,6 +163,7 @@ def evaluate(filepath):
                 for label in classes:
                     print(label)
                     label_idx = dataset.classname_to_idx(label)
+
                     args = base_args + " -cl " + str(label_idx)
                     args = args + " -r " + xai_method
                     args = args + " -l " + ":".join(layers)
@@ -164,7 +172,7 @@ def evaluate(filepath):
                         for i in range(math.ceil(len(dataset) / job_size)):
                             job_args = args + " -si " + str(i * job_size) + " -ei " + str((i + 1) * job_size)
 
-                            submit_on_sungrid(job_args, configs, "relevance_computation", job_index)
+                            submit_on_sungrid(job_args, configs, configs, "relevance_computation", job_index)       # ToDo
                             job_index += 1
 
                     elif backend == "ubuntu":
@@ -186,25 +194,41 @@ def evaluate(filepath):
 
                 job_index = 0
                 for xai_method in xai_methods:
-                    job_args = method_args + " -r " + xai_method
+                    method_args = method_args + " -r " + xai_method
 
-                    if quantification in ["pixelflipping"]:
+                    if quantification != "one_class_separability":
 
-                        job_args = job_args + " -l " + layers[0]
-                        job_args = job_args + " -pd " + quantification_dict[quantification]["distribution"]
+                        for name in classes:
+                            idx = dataset.classname_to_idx(name)
 
-                    elif quantification in ["model_parameter_randomization"]:
+                            job_args = method_args + " -l " + layers[0]
+                            job_args = job_args + " -cl " + str(idx)
 
-                        job_args = job_args + " -l " + layers[0]
+                            if quantification == "pixelflipping":
 
-                    elif quantification in ["one_class_separability"]:
+                                job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
 
-                        job_args = job_args + " -l " + ":".join(layers)
+                            # elif quantification == "model_parameter_randomization":
+                            #
+                            #     job_args = job_args + " -l " + layers[0]
+                            #
+                            # elif quantification == "one_class_separability":
+                            #
+                            #     job_args = job_args + " -l " + ":".join(layers)
 
-                    # submit
-                    if backend == "sge":
-                        submit_on_sungrid(job_args, configs, quantification, job_index)
-                        job_index += 1
+                            # submit
+                            if backend == "sge":
+                                submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
+                                                  quantification, job_index)
+                                job_index += 1
+
+                    else:
+                        job_args = method_args + " -l " + layers[0]
+
+                        if backend == "sge":
+                            submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
+                                              quantification, job_index)
+                            job_index += 1
 
 
 if __name__ == "__main__":

@@ -204,10 +204,10 @@ class VOC2012Dataset(Dataset):
 
     def preprocess_label(self, label):
         """ Convert label to one hot encoding. """
-        one_hot_label = np.zeros(len(self.classes))
+        one_hot_label = np.zeros(len(self.cmap))
 
         for classname in label:
-            one_hot_label[self.classes.index(classname)] = 1
+            one_hot_label[self.cmap.index(classname)] = 1
 
         return one_hot_label
 
