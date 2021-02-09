@@ -1,206 +1,140 @@
 import argparse
-import os
 import numpy as np
-import tensorflow as tf
+import time
+import tracemalloc
 import pandas as pd
 
-from . import innvestigate
-from ..dataloading import Dataloader
+from ..dataloading.custom import get_dataset
+from ..dataloading.dataloader import DataLoader
+from ..helpers.universal_helper import compute_relevance_path, join_path, extract_filename
 
 
-def load_relevance_maps_for_label(data_path, partition, label):
-    """ Load a selection of relevance maps
-    label: int - class label to get data for
-    """
+def get_explanation(relevance_path, data_name, model_name, layer, xai_method, filename, label):
+    """ Load explanation for given filename and label. """
+    filename = extract_filename(filename)
+    explanation_dir = compute_relevance_path(relevance_path, data_name, model_name, layer, xai_method)
+    fname = join_path(explanation_dir, ["val", str(label), filename])
 
-    dir_path = data_path + "/" + partition + "/" + str(label)
+    explanation = np.load(fname + ".npy")
 
-    # load data from indices
-    data_files = os.listdir(dir_path)
-    data_files.sort(key=lambda f: int(f.split("_", 1)[0]))
-
-    R_c = []
-    for file in data_files:
-        R_c.append(np.load(dir_path + "/" + file))
-
-    R_c = np.concatenate(R_c)
-
-    return R_c
+    if len(explanation.shape) == 3:
+        explanation = np.mean(explanation, axis=2)
+    return explanation
 
 
-def parse_xai_method(xai_method):
-    # Gradient methods
-    if xai_method == "Gradient":
-        analyzer = innvestigate.analyzer.Gradient
-    elif xai_method == "SmoothGrad":
-        analyzer = innvestigate.analyzer.SmoothGrad
-    # LRP methods
-    elif xai_method == "LRPZ":
-        analyzer = innvestigate.analyzer.LRPZ
-    elif xai_method == 'LRPEpsilon':
-        analyzer = innvestigate.analyzer.LRPEpsilon
-    elif xai_method == 'LRPWSquare':
-        analyzer = innvestigate.analyzer.LRPWSquare
-    elif xai_method == 'LRPGamma':
-        analyzer = innvestigate.analyzer.LRPGamma
-    elif xai_method == 'LRPAlpha1Beta0':
-        analyzer = innvestigate.analyzer.LRPAlpha1Beta0
-    elif xai_method == 'LRPAlpha2Beta1':
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1
-    elif xai_method == 'LRPSequentialPresetA':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetA
-    elif xai_method == 'LRPSequentialPresetB':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetB
-    elif xai_method == 'LRPSequentialCompositeA':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeA
-    elif xai_method == 'LRPSequentialCompositeB':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeB
-    elif xai_method == 'LRPSequentialCompositeBFlat':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeBFlat
-    # innvestigate.analyzer.LRPGamma
+def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name,
+                                 layer_names, xai_method, output_dir):
+    """ Computes the pointing game score score. """
+
+    if isinstance(layer_names, list):
+        input_layer = layer_names[0]
     else:
-        print("analyzer name " + xai_method + " not correct")
-        analyzer = None
-    return analyzer
+        input_layer = layer_names
 
+    scores = {}
 
-# Setting up an argument parser for command line calls
-parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
+    # initialize dataset
+    datasetclass = get_dataset(dataset_name)
+    dataset = datasetclass(data_path, "val")
+    dataset.set_mode("raw")
 
-parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
-parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
-parser.add_argument("-rd", "--relevance_datapath", type=str, default=None, help="data folder of relevance maps")
-parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
-parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
-parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
-parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
-parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
-parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
-parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
-parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
-parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    # iterate classes
+    for label in dataset.classes:
 
-ARGS = parser.parse_args()
+        classidx = str(dataset.classname_to_idx(label))
 
-#####################
-#       MAIN
-#####################
+        # initialize class score
+        class_score = 0
 
-flip_percentage = 0.5
-flip_percentages = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        # initialize class dataset
+        class_data = datasetclass(data_path, "val", classidx=[classidx])
+        class_data.set_mode("binary_mask")
 
-# load data
-# if ARGS.data_path:
-#     print(ARGS.data_path)
-# else:
-#     print("load data from " + ARGS.data_name)
-#     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+        dataloader = DataLoader(class_data, batch_size=batch_size)
 
-# preprocess data
-# x_train = x_train / 127.5 - 1
-# x_test = x_test / 127.5 - 1
+        for batch in dataloader:
 
-dataloader = Dataloader(datapath=ARGS.data_path, batch_size=ARGS.batch_size)
-data = dataloader.get_data("val")
-y_test, classes = dataloader.get_indices("val")
+            for sample in batch:
+                # get attribution to classidx
+                explanation = get_explanation(relevance_path, data_name, model_name, input_layer, xai_method,
+                                              sample.filename, classidx)
 
-# load model
-if ARGS.model_path:
-    # load model
-    print(ARGS.model_path)
-    model = tf.keras.models.load_model(ARGS.model_path)
-else:
-    # optionally add training sequence here??
-    print("No model path given! Please add with -m model_path")
+                # find index of max value
+                maxindex = np.where(explanation == np.max(explanation))
 
-# estimate model score before flipping the pixels
-pre_flip_score = model.evaluate(data, verbose=0)
+                binary_mask = sample.binary_mask[label]
 
-# preprocess model
-# model_wo_softmax = innvestigate.utils.keras.graph.model_wo_softmax(model)
-#
-# # get analyzer
-# analyzer = parse_xai_method(ARGS.rule)
-# ana = analyzer(model_wo_softmax)
-#
-# # compute relevance maps
-# rmaps = ana.analyze(x_test, neuron_selection=y_test, explained_layer_names=["conv2d"])
+                # check if maximum of explanation is on target object class
+                # case max is at more than one pixel
+                if len(maxindex[0]) > 1:
+                    is_in = 0
+                    for pixel in maxindex:
+                        is_in = is_in or binary_mask[pixel[0], pixel[1]]
+                    class_score += is_in
+                # print(binary_mask[maxindex[0], maxindex[1]])
+                else:
+                    class_score += binary_mask[maxindex[0], maxindex[1]]
 
-imgs = []
-R_maps = []
-all_Rs = []
+        print(class_score)
+        print(len(class_data))
+        scores[classidx] = float(class_score) / len(class_data)
 
-# load relevance maps
-for c in classes:
-
-    R_c = load_relevance_maps_for_label(ARGS.relevance_datapath + "/" + ARGS.data_name + "/" + ARGS.model_name + "/" + ARGS.layer + "/" + ARGS.rule + "/", "val", c)
-    all_Rs.append(R_c)
-
-print(y_test.shape)
-print(len(all_Rs))
-# filter correct relevance maps
-for i, label in enumerate(y_test):
-    index = np.where(label == 1)[0][0]
-    index = list(classes).index(index)
-
-    R_maps.append(all_Rs[index][i])
-R_maps = np.array(R_maps)
-print(R_maps.shape)
-
-# load images to array
-for batch in data.as_numpy_iterator():
-    imgs.append(batch[0])
-imgs = np.concatenate(imgs)
-print("img to array done")
-print(imgs.shape)
-
-assert (R_maps.shape == imgs.shape)
-print("assert statement passed")
-
-# order image indices by relevance
-R_maps = np.sum(R_maps, axis=3)
-
-# iterate flip percentage values
-results = []
-
-for flip_percentage in flip_percentages:
-    flipped_imgs = []
-
-    # iterate test data
-    for i, img in enumerate(imgs):
-
-        # sort indices by relevance
-        indices = np.argsort(R_maps[i], axis=None)
-
-        print(np.take_along_axis(R_maps[i], indices))
-        # get first of pixel indices
-        # indices = indices[:int(flip_percentage * len(indices))]
-        # get last of pixel indices
-        indices = indices[int(flip_percentage * len(indices)):]
-
-        # flip pixels
-        for axis in range(img.shape[2]):
-            uniform_values = np.random.uniform(-1.0, 1.0, len(indices))
-            np.put_along_axis(img[:, :, axis], indices, uniform_values, axis=None)
-
-        # save to array
-        flipped_imgs.append(img)
-
-    flipped_imgs = np.array(flipped_imgs)
-    print("images flipped")
-
-    # estimate classification accuracy
-    flip_score = model.evaluate(flipped_imgs, y_test)
-
-    # print results
-    print("estimated score before pixelflipping:")
-    print(pre_flip_score)
-    print("estimated score after pixelflipping:")
-    print(flip_score)
-
-    results.append([ARGS.data_name, ARGS.model_name, ARGS.rule, str(flip_percentage), str(pre_flip_score), str(flip_score)])
+    # save results
+    results = []
+    for key in scores:
+        results.append([data_name, model_name, xai_method, str(key), str(scores[key])])
 
     df = pd.DataFrame(results,
-                      columns=['dataset', 'model', 'method', 'flip_percentage', 'actual score', 'flipped_score'])
-    df.to_csv(ARGS.output_dir + ARGS.data_name + "_" + ARGS.model_name + "_" + ARGS.rule + ".csv", index=False)
+                      columns=['dataset', 'model', 'method', 'classidx', 'score'])
+    df.to_csv(join_path(output_dir, data_name + "_" + model_name + "_" + xai_method + ".csv"), index=False)
+
+
+if __name__ == "__main__":
+    # Setting up an argument parser for command line calls
+    parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
+
+    parser.add_argument("-d", "--data_path", type=str, default=None, help="data path")
+    parser.add_argument("-dn", "--data_name", type=str, default=None, help="The name of the dataset to be used")
+    parser.add_argument("-dl", "--dataset_name", type=str, default=None,
+                        help="The name of the dataloader class to be used.")
+    parser.add_argument("-rd", "--relevance_datapath", type=str, default=None, help="data folder of relevance maps")
+    parser.add_argument("-o", "--output_dir", type=str, default="./output",
+                        help="Sets the output directory for the results")
+    parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
+    parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
+    parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
+    parser.add_argument("-p", "--partition", type=str, default="train",
+                        help="Either train or val for one of these partitions")
+    parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
+    parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA",
+                        help="Rule to be used to compute relevance maps")
+    parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
+    parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+
+    ARGS = parser.parse_args()
+
+    #####################
+    #       MAIN
+    #####################
+
+    print("start pointing game score estimation now")
+    start = time.process_time()
+    tracemalloc.start()
+
+    estimate_pointing_game_score(ARGS.data_path,
+                             ARGS.data_name,
+                             ARGS.dataset_name,
+                             ARGS.relevance_datapath,
+                             ARGS.partition,
+                             ARGS.batch_size,
+                             ARGS.model_name,
+                             ARGS.layer,
+                             ARGS.rule,
+                             ARGS.output_dir)
+
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"Current memory usage is {current / 10 ** 6}MB; Peak was {peak / 10 ** 6}MB")
+    tracemalloc.stop()
+    print("Duration of pointing game score estimation:")
+    print(time.process_time() - start)

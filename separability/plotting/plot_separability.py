@@ -30,6 +30,9 @@ with open(filepath) as file:
                 # print(float(csv["separability_score"]))
                 scores.append(float(csv["separability_score"]))
 
-            plt.plot(scores)
+            plt.plot(range(20), scores)
 
+        plt.xlabel("class_label")
+        plt.ylabel("separability score")
+        plt.legend(configs["xai_methods"])
         plt.show()

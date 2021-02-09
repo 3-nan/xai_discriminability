@@ -32,7 +32,10 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     """ Load data for the svm classification. """
 
     if classidx in classes:
-        classes.remove(classidx)
+        classindices = classes.copy()
+        classindices.remove(classidx)
+    else:
+        classindices = classes
 
     data = []
     labels = []
@@ -47,9 +50,9 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
         labels.append(np.ones(len(explanations)))
 
         # repeat
-        for r in range(5):
+        for r in range(3):
             # non-target explanations
-            selected_classes = [random.choice(classes) for i in range(len(batch))]
+            selected_classes = [random.choice(classindices) for i in range(len(batch))]
             explanations = load_explanations(explanationdir, batch, classidx=selected_classes)
 
             data.append(explanations)
@@ -60,43 +63,9 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     data = np.concatenate(data)
     labels = np.concatenate(labels)
 
-    return data, labels
+    p = np.random.permutation(len(labels))
 
-
-# def load_relevance_map_selection(data_path, partition, label, filenames):
-#     """ Load a selection of relevance maps
-#     label: int - class label to get data for
-#     """
-#     rmaps = []
-#     labels = []
-#
-#     for dir in os.scandir(join_path(data_path, partition)):
-#
-#         R_c = []
-#
-#         for filename in filenames:
-#             R_c.append(np.load(join_path(dir.path, filename) + ".npy"))
-#
-#         rmaps.append(R_c)
-#
-#         # add labels for correct / incorrect class to labels
-#         if dir.name == str(label):
-#             # append true to labels
-#             labels.append(np.ones(len(filenames)))
-#         else:
-#             # append false to labels
-#             labels.append(np.zeros(len(filenames)))
-#
-#     rmaps = np.concatenate(rmaps)
-#     labels = np.concatenate(labels)
-#
-#     print(rmaps.shape)
-#     print(labels.shape)
-#
-#     # shuffle files
-#     p = np.random.permutation(len(labels))
-#
-#     return rmaps[p], labels[p]
+    return data[p], labels[p]
 
 
 def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_names, rule, output_dir):
@@ -111,7 +80,10 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
     dataset = datasetclass(data_path, "train")
     dataset.set_mode("raw")
 
+    print(dataset.classes)
     class_indices = [str(dataset.classname_to_idx(name)) for name in dataset.classes]
+
+    print("Estimate scores for classindices {}".format(class_indices))
 
     # iterate classes
     for classidx in class_indices:
@@ -122,7 +94,9 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         class_data = datasetclass(data_path, "train", classidx=[classidx])
         class_data.set_mode("raw")
 
-        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, startidx=0, endidx=1000)
+        print("number of samples for this class is {}".format(len(class_data)))
+
+        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, startidx=0, endidx=2000)
 
         # load relevance maps from train partition to train clf
         Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
@@ -136,7 +110,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         elif len(Rc_data.shape) == 4:
             Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
 
-        clf = LinearSVC()
+        clf = LinearSVC(class_weight="balanced")
         clf.fit(Rc_data, labels)
 
         # load test data
@@ -158,7 +132,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         # compute score
         score = clf.score(Rc_test, test_labels)
 
-        print("separability score for class " + str(classidx))
+        print("separability score for class {}".format(classidx))
         print(score)
 
         resultdir = join_path(output_dir, data_name + "_" + model_name)
@@ -168,7 +142,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
                           columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
-        df.to_csv(resultdir + "/" + layer_name + "_" + rule + "_" + classidx + ".csv", index=False)
+        df.to_csv(resultdir + "/" + layer_name + "_" + rule + "_" + str(classidx) + ".csv", index=False)
 
 
 if __name__ == "__main__":

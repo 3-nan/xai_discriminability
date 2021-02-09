@@ -196,7 +196,7 @@ def evaluate(filepath):
                 for xai_method in xai_methods:
                     method_args = method_args + " -r " + xai_method
 
-                    if quantification != "one_class_separability":
+                    if quantification in ["attribution_localization", "model_parameter_randomization", "pixelflipping"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)

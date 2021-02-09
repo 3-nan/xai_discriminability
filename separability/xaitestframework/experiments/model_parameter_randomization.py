@@ -56,6 +56,10 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
                 # compute similarity
                 original_explanation = np.load(join_path(explanationdir, ["val", str(classidx), extract_filename(batch[i].filename)]) + ".npy")
 
+                # normalize explanations
+                original_explanation = original_explanation / np.max(original_explanation)
+                explanation = explanation / np.max(explanation)
+
                 diff.append((np.square(original_explanation - explanation)).mean(axis=None))
 
         # compute results and save to dict
@@ -75,7 +79,7 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
     df = pd.DataFrame(results,
                       columns=['dataset', 'model', 'method', 'classindex', 'layer', 'score'])
-    df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + "_" + classidx + ".csv"),
+    df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + "_" + str(classidx) + ".csv"),
               index=False)
 
 
@@ -107,7 +111,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 1: cascading layer randomization top-down
     print("case 1: cascading layer randomization top-down")
-    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_top_down"])
+    case_output_dir = join_path(output_dir, ["cascading_top_down"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                         explanationdir, case_output_dir, top_down=True)
     # save results
@@ -116,7 +120,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 2: cascading layer randomization bottom-up
     print("case 2: cascading layer randomization bottom-up")
-    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "cascading_bottom_up"])
+    case_output_dir = join_path(output_dir, ["cascading_bottom_up"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                         explanationdir, case_output_dir, top_down=False)
     # save results
@@ -125,7 +129,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 3: independent layer randomization
     print("case 3: independent layer randomization")
-    case_output_dir = join_path(output_dir, ["model_parameter_randomization", "independent"])
+    case_output_dir = join_path(output_dir, ["independent"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                         explanationdir, case_output_dir, top_down=False, independent=True)
     # save results
