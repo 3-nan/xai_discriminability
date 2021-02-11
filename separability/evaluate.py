@@ -207,10 +207,13 @@ def evaluate(filepath):
                             if quantification == "pixelflipping":
 
                                 job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
+                                percentages = ":".join([str(p) for p in percentages])
+                                job_args = job_args + " -pv " + percentages
 
-                            # elif quantification == "model_parameter_randomization":
-                            #
-                            #     job_args = job_args + " -l " + layers[0]
+                            elif quantification == "model_parameter_randomization":
+
+                                if quantification_dict[quantification]["args"]["max_index"]:
+                                    job_args = job_args + " -mi " + quantification_dict[quantification]["args"]["max_index"]
                             #
                             # elif quantification == "one_class_separability":
                             #
@@ -223,12 +226,13 @@ def evaluate(filepath):
                                 job_index += 1
 
                     else:
-                        job_args = method_args + " -l " + layers[0]
+                        for layer in layers:
+                            job_args = method_args + " -l " + layer
 
-                        if backend == "sge":
-                            submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
-                                              quantification, job_index)
-                            job_index += 1
+                            if backend == "sge":
+                                submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
+                                                  quantification, job_index)
+                                job_index += 1
 
 
 if __name__ == "__main__":

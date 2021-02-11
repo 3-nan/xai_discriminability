@@ -54,6 +54,7 @@ quantifications:
 #          memory_per_job: 5G
   - model_parameter_randomization:
       args:
+          max_index: 600
       config:
           memory_per_job: 20G
 #  - one_class_separability:

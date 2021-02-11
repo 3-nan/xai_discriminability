@@ -11,14 +11,14 @@ from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import extract_filename
 
 
-def get_relevance_dir_path(output_dir, data_name, model_name, layer, rule, partition, class_name):
+def combine_path(output_dir, attributes, data_name, model_name, layer, rule, partition, class_name):
     """ Computes directory path to save computed relevance to. """
 
     # remove backslash at the end
     if output_dir[-1] == "/":
         output_dir = output_dir[:-1]
 
-    for attr in [data_name, model_name, layer, rule, partition, str(class_name)]:
+    for attr in attributes:
 
         if not os.path.exists(output_dir + "/" + attr):
             os.makedirs(output_dir + "/" + attr)
@@ -38,11 +38,15 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
     # initialize dataset
     dataset = get_dataset(dataset_name)
     dataset = dataset(data_path, partition)
-    compute_explanations_for_class(data_name, dataset, partition, batch_size, model, model_name, layer_names,
+
+    # compute/create output dir
+    output_dir = combine_path(output_dir, [data_name, model_name])
+
+    compute_explanations_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=startidx, endidx=endidx)
 
 
-def compute_explanations_for_class(data_name, dataset, partition, batch_size, model, model_name, layer_names,
+def compute_explanations_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Computes the explanations for the selected class and saves them to output dir. """
     dataset.set_mode("preprocessed")
@@ -58,8 +62,7 @@ def compute_explanations_for_class(data_name, dataset, partition, batch_size, mo
         R = model.compute_relevance(imgs, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
 
         for layer_name in layer_names:
-            layer_output_dir = get_relevance_dir_path(output_dir, data_name, model_name, layer_name, xai_method,
-                                                      partition, class_name)
+            layer_output_dir = combine_path(output_dir, [layer_name, xai_method, partition, str(class_name)])
             for r, relevance in enumerate(R[layer_name]):
                 fname = extract_filename(batch[r].filename)
                 filename = layer_output_dir + "/" + fname + ".npy"

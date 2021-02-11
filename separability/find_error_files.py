@@ -1,7 +1,7 @@
 import os
 
 
-dir = "logs-quantification"
+dir = "logs-debug"
 
 for filename in os.listdir(dir):
 
@@ -9,7 +9,10 @@ for filename in os.listdir(dir):
         file = open(dir + "/" + filename, "r")
 
         # print(file.readlines()[-1])
-        lastrow = file.readlines()[-1]
+        try:
+            lastrow = file.readlines()[-1]
+        except IndexError:
+            print(filename)
 
         if lastrow != "Job executed successfully.\n":
             print(filename)

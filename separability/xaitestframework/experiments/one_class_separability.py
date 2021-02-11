@@ -25,7 +25,12 @@ def load_explanations(explanationdir, samples, classidx):
         for s, sample in enumerate(samples):
             explanations.append(np.load(join_path(explanationdir, [str(classidx), extract_filename(sample.filename)]) + ".npy"))
 
-    return np.mean(np.array(explanations), axis=3)
+    explanations = np.array(explanations)
+
+    if len(explanations.shape) > 3:
+        explanations = np.mean(explanations, axis=3)
+
+    return explanations
 
 
 def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir):
@@ -50,7 +55,7 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
         labels.append(np.ones(len(explanations)))
 
         # repeat
-        for r in range(3):
+        for r in range(4):
             # non-target explanations
             selected_classes = [random.choice(classindices) for i in range(len(batch))]
             explanations = load_explanations(explanationdir, batch, classidx=selected_classes)
@@ -68,10 +73,10 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     return data[p], labels[p]
 
 
-def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_names, rule, output_dir):
+def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
     """ Compute the separability score for the provided relevances. """
 
-    layer_name = layer_names[0]     # TODO: iterate layers
+    # layer_name = layer_names[0]     # TODO: iterate layers
 
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
 
@@ -96,7 +101,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         print("number of samples for this class is {}".format(len(class_data)))
 
-        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, startidx=0, endidx=2000)
+        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True)  # , startidx=0, endidx=2000)
 
         # load relevance maps from train partition to train clf
         Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
@@ -151,9 +156,9 @@ if __name__ == "__main__":
 
     print("one_class_separability")
 
-    def decode_layernames(string):
-        """ Decodes the layer_names string to a list of strings. """
-        return string.split(":")
+    # def decode_layernames(string):
+    #     """ Decodes the layer_names string to a list of strings. """
+    #     return string.split(":")
 
     # Setting up an argument parser for command line calls
     parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
@@ -170,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
     parser.add_argument("-cl", "--class_label", type=int, default=0, help="Index of class to compute heatmaps for")
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
-    parser.add_argument("-l", "--layer", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
+    parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
 
     ARGS = parser.parse_args()

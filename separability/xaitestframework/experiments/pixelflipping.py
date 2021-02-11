@@ -23,33 +23,46 @@ def load_explanations(explanationdir, samples, classidx):
     return np.array(explanations)
 
 
-def compute_pixelflipping_score(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir):
-    """ Estimate the pixelflipping score. """
+def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir, percentage_values):
+    """ Wrapper function to load data/model and compute directory paths. """
 
-    print("compute score for classidx {}".format(classidx))
-    # flip_percentages = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8,
-    #                     0.9]
-
-    flip_percentages = [0.0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5]
-
-    # construct explanationpath
+    # construct explanationdir
     explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
     explanationdir = join_path(explanationdir, partition)
 
     # init model
     model = init_model(model_path)
 
-    # prep result structure
-    class_score = {}
-    for percentage in flip_percentages:
-        class_score[percentage] = []
-
-    # load dataset for this class
+    # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
     class_data = datasetclass(data_path, partition, classidx=[classidx])
     class_data.set_mode("preprocessed")
 
     dataloader = DataLoader(class_data, batch_size=batch_size)
+
+    # run pixelflipping computation
+    class_score = compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rule, distribution, percentage_values)
+
+    # collect results and write to file
+    results = []
+    for key in class_score:
+        results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
+
+    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
+    df.to_csv(
+        join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv",
+        index=False)
+
+
+def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rule, distribution, percentage_values):
+    """ Estimate the pixelflipping score. """
+
+    print("compute score for classidx {}".format(classidx))
+
+    # prep result structure
+    class_score = {}
+    for percentage in percentage_values:
+        class_score[percentage] = []
 
     # iterate data
     for batch in dataloader:
@@ -73,7 +86,7 @@ def compute_pixelflipping_score(data_path, data_name, dataset_name, classidx, re
         print(indices.shape)
 
         # loop flip_percentages
-        for percentage in flip_percentages:
+        for percentage in percentage_values:
 
             # get first percentage part of pixel indices (lowest relevance)
             # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
@@ -102,22 +115,29 @@ def compute_pixelflipping_score(data_path, data_name, dataset_name, classidx, re
             # compute score on flipped data
             # predictions = model.predict(flipped_data, batch_size=len(flipped_data))
             predictions = model.predict(flipped_data, batch_size=len(flipped_data))
-            # print(predictions)
-            # print(predictions.shape)
-            # print(predictions[:, classidx])
 
             class_score[percentage].append(predictions[:, classidx])
 
-    # collect results and write to file
-    results = []
-    for key in class_score:
-        results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
+    for percentage in percentage_values:
+        class_score[percentage] = np.mean(np.concatenate(class_score[percentage]))
+    # # collect results and write to file
+    # results = []
+    # for key in class_score:
+    #     results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
+    #
+    # df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
+    # df.to_csv(join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv", index=False)
 
-    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
-    df.to_csv(join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv", index=False)
+    return class_score
 
 
 if __name__ == "__main__":
+
+    def uncompress_percentages(string):
+        percentages = string.split(":")
+        percentages = [float(p) for p in percentages]
+        return percentages
+
     # Setting up an argument parser for command line calls
     parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
 
@@ -136,6 +156,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
     parser.add_argument("-pd", "--distribution", type=str, default="", help="Probability distribution to sample flipped pixels from (uniform, gaussian)")
+    parser.add_argument("-pv", "--percentage_values", type=uncompress_percentages, help="Percentage values compressed as string value:value:value")
 
     ARGS = parser.parse_args()
 
@@ -147,19 +168,20 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    compute_pixelflipping_score(ARGS.data_path,
-                                ARGS.data_name,
-                                ARGS.dataloader_name,
-                                ARGS.class_label,
-                                ARGS.relevance_datapath,
-                                ARGS.partition,
-                                ARGS.batch_size,
-                                ARGS.model_path,
-                                ARGS.model_name,
-                                ARGS.layer,
-                                ARGS.rule,
-                                ARGS.distribution,
-                                ARGS.output_dir)
+    pixelflipping_wrapper(ARGS.data_path,
+                          ARGS.data_name,
+                          ARGS.dataloader_name,
+                          ARGS.class_label,
+                          ARGS.relevance_datapath,
+                          ARGS.partition,
+                          ARGS.batch_size,
+                          ARGS.model_path,
+                          ARGS.model_name,
+                          ARGS.layer,
+                          ARGS.rule,
+                          ARGS.distribution,
+                          ARGS.output_dir,
+                          ARGS.percentage_values)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")

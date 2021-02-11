@@ -35,13 +35,13 @@ layers:
   #- fc2
 
 xai_methods:
-  #- LRPZ
+  - LRPZ
   - LRPAlpha1Beta0
-  #- LRPSequentialCompositeA
+  - LRPSequentialCompositeA
   - LRPSequentialCompositeBFlat
-  #- LRPGamma
-  #- Gradient
-  #- SmoothGrad
+  - LRPGamma
+  - Gradient
+  - SmoothGrad
 
 classes:
   - all

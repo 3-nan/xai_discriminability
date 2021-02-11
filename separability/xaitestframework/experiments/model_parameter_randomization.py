@@ -58,7 +58,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
 
                 # normalize explanations
                 original_explanation = original_explanation / np.max(original_explanation)
-                explanation = explanation / np.max(explanation)
+                explanation = explanation / np.max(np.abs(explanation))
 
                 diff.append((np.square(original_explanation - explanation)).mean(axis=None))
 
@@ -84,7 +84,7 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
 
 def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size, model_path, model_name,
-                                  bottom_layer, xai_method, explanationdir, output_dir):
+                                  bottom_layer, xai_method, explanationdir, output_dir, maxidx=None):
     """ Function to create explanations on randomized models. """
 
     # init model
@@ -107,7 +107,10 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     print(type(class_data))
 
-    dataloader = DataLoader(class_data, batch_size=batch_size)
+    if maxidx:
+        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, endidx=maxidx)
+    else:
+        dataloader = DataLoader(class_data, batch_size=batch_size)
 
     # CASE 1: cascading layer randomization top-down
     print("case 1: cascading layer randomization top-down")
@@ -161,6 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
     parser.add_argument("-l", "--layer", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    parser.add_argument("-mi", "--max_idx", type=int, default=None, help="Max class index to compute values for")
 
     ARGS = parser.parse_args()
 
@@ -183,7 +187,8 @@ if __name__ == "__main__":
                                   ARGS.layer[0],
                                   ARGS.rule,
                                   ARGS.relevance_datapath,
-                                  ARGS.output_dir
+                                  ARGS.output_dir,
+                                  maxidx=ARGS.max_idx
                                   )
 
     current, peak = tracemalloc.get_traced_memory()
