@@ -8,6 +8,8 @@ def parse_xai_method(xai_method, additional_parameter=None):
         analyzer = innvestigate.analyzer.Gradient
     elif xai_method == "SmoothGrad":
         analyzer = innvestigate.analyzer.SmoothGrad
+    elif xai_method == "Deconvnet":
+        analyzer = innvestigate.analyzer.Deconvnet
     # LRP methods
     elif xai_method == "LRPZ":
         analyzer = innvestigate.analyzer.LRPZ

@@ -143,17 +143,7 @@ def evaluate(filepath):
             classes = dataset.classes
 
         # add quantification specific arguments
-        if quantifications[0] == "relevance_computation":
-
-            # base_args += " -o " + join_path(outputdir, "separability")
-
-            # dataset = get_dataset(dataset)
-            # dataset = dataset(datapath, partition)
-            #
-            # print(len(dataset))
-            #
-            # if classes[0] == "all":
-            #     classes = dataset.classes
+        if list(quantifications[0].keys())[0] == "relevance_computation":
 
             job_size = 1000  # number of images to process per job
             job_index = 0
@@ -172,7 +162,8 @@ def evaluate(filepath):
                         for i in range(math.ceil(len(dataset) / job_size)):
                             job_args = args + " -si " + str(i * job_size) + " -ei " + str((i + 1) * job_size)
 
-                            submit_on_sungrid(job_args, configs, configs, "relevance_computation", job_index)       # ToDo
+                            submit_on_sungrid(job_args, configs, quantifications[0]["relevance_computation"]["config"],
+                                              "relevance_computation", job_index)       # ToDo
                             job_index += 1
 
                     elif backend == "ubuntu":
@@ -207,17 +198,15 @@ def evaluate(filepath):
                             if quantification == "pixelflipping":
 
                                 job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
-                                percentages = ":".join([str(p) for p in percentages])
+                                percentages = ":".join([str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
                                 job_args = job_args + " -pv " + percentages
 
                             elif quantification == "model_parameter_randomization":
 
                                 if quantification_dict[quantification]["args"]["max_index"]:
-                                    job_args = job_args + " -mi " + quantification_dict[quantification]["args"]["max_index"]
-                            #
-                            # elif quantification == "one_class_separability":
-                            #
-                            #     job_args = job_args + " -l " + ":".join(layers)
+                                    job_args = job_args + " -mi " + str(quantification_dict[quantification]["args"]["max_index"])
+                                if quantification_dict[quantification]["args"]["distance_measure"]:
+                                    job_args = job_args + " -dm " + quantification_dict[quantification]["args"]["distance_measure"]
 
                             # submit
                             if backend == "sge":

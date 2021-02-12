@@ -2,8 +2,8 @@ import argparse
 import os
 import time
 import tracemalloc
-import copy
 import numpy as np
+from scipy.spatial.distance import cosine
 import pandas as pd
 
 from ..dataloading.custom import get_dataset
@@ -14,7 +14,7 @@ from ..helpers.universal_helper import extract_filename, compute_relevance_path,
 
 # implement layer randomization
 def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir, output_dir,
-                        top_down=True, independent=False):
+                        top_down=True, independent=False, distance="cosine"):
 
     # configure save dir
     if not os.path.exists(join_path(output_dir, "explanations")):
@@ -60,7 +60,20 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
                 original_explanation = original_explanation / np.max(original_explanation)
                 explanation = explanation / np.max(np.abs(explanation))
 
-                diff.append((np.square(original_explanation - explanation)).mean(axis=None))
+                if distance == "mse":
+                    diff.append((np.square(original_explanation - explanation)).mean(axis=None))
+                elif distance == "cosine":
+                    if len(original_explanation.shape) == 2:
+                        original_explanation = original_explanation.reshape((original_explanation.shape[0]
+                                                                             * original_explanation.shape[1]))
+                        explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]))
+                    elif len(original_explanation.shape) == 3:
+                        original_explanation = original_explanation.reshape(
+                            (original_explanation.shape[0] * original_explanation.shape[1]
+                             * original_explanation.shape[2]))
+                        explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]
+                                                           * explanation.shape[2]))
+                    diff.append(cosine(original_explanation, explanation))
 
         # compute results and save to dict
         diff = np.mean(diff)
@@ -84,8 +97,12 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
 
 def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size, model_path, model_name,
-                                  bottom_layer, xai_method, explanationdir, output_dir, maxidx=None):
+                                  bottom_layer, xai_method, explanationdir, output_dir, maxidx=None, distance=None):
     """ Function to create explanations on randomized models. """
+
+    # set distance measure
+    if not distance:
+        distance = "cosine"
 
     # init model
     model = init_model(model_path)
@@ -116,7 +133,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print("case 1: cascading layer randomization top-down")
     case_output_dir = join_path(output_dir, ["cascading_top_down"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                        explanationdir, case_output_dir, top_down=True)
+                                        explanationdir, case_output_dir, top_down=True, distance=distance)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -125,7 +142,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print("case 2: cascading layer randomization bottom-up")
     case_output_dir = join_path(output_dir, ["cascading_bottom_up"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                        explanationdir, case_output_dir, top_down=False)
+                                        explanationdir, case_output_dir, top_down=False, distance=distance)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -133,8 +150,8 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # CASE 3: independent layer randomization
     print("case 3: independent layer randomization")
     case_output_dir = join_path(output_dir, ["independent"])
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                        explanationdir, case_output_dir, top_down=False, independent=True)
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir,
+                                        case_output_dir, top_down=False, independent=True, distance=distance)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -165,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--layer", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
     parser.add_argument("-mi", "--max_idx", type=int, default=None, help="Max class index to compute values for")
+    parser.add_argument("-dm", "--distance_measure", type=str, default=None, help="Distance measure to compute between explanations.")
 
     ARGS = parser.parse_args()
 
@@ -188,7 +206,8 @@ if __name__ == "__main__":
                                   ARGS.rule,
                                   ARGS.relevance_datapath,
                                   ARGS.output_dir,
-                                  maxidx=ARGS.max_idx
+                                  maxidx=ARGS.max_idx,
+                                  distance=ARGS.distance_measure
                                   )
 
     current, peak = tracemalloc.get_traced_memory()

@@ -42,6 +42,7 @@ xai_methods:
   - LRPGamma
   - Gradient
   - SmoothGrad
+  - Deconvnet
 
 classes:
   - all
@@ -60,7 +61,7 @@ quantifications:
             - 0.3
             - 0.4
             - 0.5
-          distribution: uniform   # uniform, gaussian
+          distribution: gaussian   # uniform, gaussian
       config:
           memory_per_job: 5G
 #  - model_parameter_randomization:

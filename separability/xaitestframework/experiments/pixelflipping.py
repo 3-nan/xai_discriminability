@@ -50,7 +50,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
 
     df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
     df.to_csv(
-        join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv",
+        join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + "_" + str(classidx) + ".csv",
         index=False)
 
 

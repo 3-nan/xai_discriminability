@@ -134,8 +134,12 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         elif len(Rc_test.shape) == 4:
             Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
 
+        # compute sample weights
+        sample_weights = (1 - np.mean(test_labels)) * test_labels
+        sample_weights[sample_weights == 0] = np.mean(test_labels)
+
         # compute score
-        score = clf.score(Rc_test, test_labels)
+        score = clf.score(Rc_test, test_labels, sample_weight=sample_weights)
 
         print("separability score for class {}".format(classidx))
         print(score)

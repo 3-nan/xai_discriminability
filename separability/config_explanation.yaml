@@ -10,7 +10,7 @@ data:
   datapath: /data/cluster/users/motzkus/data/VOC2012/
   dataname: voc2012
   datasetobject: VOC2012Dataset
-  partition: val  # might delete to enable simultaneous computation on train/val dataset
+  partition: train  # might delete to enable simultaneous computation on train/val dataset
   batchsize: 50
 
 model:
@@ -19,8 +19,8 @@ model:
   modeltype: tensorflow
 
 dirs:
-  logdir: logs-debug/
-  scriptdir: scripts-debug/
+  logdir: logs-explanation/
+  scriptdir: scripts-explanation/
   explanationdir: /data/cluster/users/motzkus/relevance_maps
   outputdir: /data/cluster/users/motzkus/results
 
@@ -35,30 +35,33 @@ layers:
   - fc2
 
 xai_methods:
-  - LRPZ
-  - LRPAlpha1Beta0
-  - LRPSequentialCompositeA
-  - LRPSequentialCompositeBFlat
-  - LRPGamma
-  - Gradient
-  #- SmoothGrad
+#  - LRPZ
+#  - LRPAlpha1Beta0
+#  - LRPSequentialCompositeA
+#  - LRPSequentialCompositeBFlat
+#  - LRPGamma
+#  - Gradient
+#  - SmoothGrad
+  - Deconvnet
 
 classes:
   - all
 
 quantifications:
-#  - relevance_computation:
+  - relevance_computation:
+      config:
+          memory_per_job: 20G
 #  - pixelflipping:
 #      args:
 #          distribution: uniform   # uniform, gaussian
 #      config:
 #          memory_per_job: 5G
-  - model_parameter_randomization:
-      args:
-          max_index: 400
-          distance_measure: cosine
-      config:
-          memory_per_job: 22G
+#  - model_parameter_randomization:
+#      args:
+#          max_index: 400
+#          distance_measure: cosine
+#      config:
+#          memory_per_job: 22G
 #  - one_class_separability:
 #      args:
 #      config:
