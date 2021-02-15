@@ -26,25 +26,26 @@ dirs:
 
 layers:
   - input_1
-  - block1_conv1
-  - block2_conv1
-  - block3_conv1
-  - block4_conv1
-  - block5_conv1
-  - fc1
-  - fc2
+#  - block1_conv1
+#  - block2_conv1
+#  - block3_conv1
+#  - block4_conv1
+#  - block5_conv1
+#  - fc1
+#  - fc2
 
 xai_methods:
   - LRPZ
-  - LRPAlpha1Beta0
-  - LRPSequentialCompositeA
-  - LRPSequentialCompositeBFlat
-  - LRPGamma
-  - Gradient
+#  - LRPAlpha1Beta0
+#  - LRPSequentialCompositeA
+#  - LRPSequentialCompositeBFlat
+#  - LRPGamma
+#  - Gradient
   #- SmoothGrad
 
 classes:
-  - all
+  - aeroplane
+#  - all
 
 quantifications:
 #  - relevance_computation:
@@ -56,7 +57,11 @@ quantifications:
   - model_parameter_randomization:
       args:
           max_index: 400
-          distance_measure: cosine
+          distance_measures:
+            - cosine
+            - ssim
+            - spearman
+            - hog
       config:
           memory_per_job: 22G
 #  - one_class_separability:

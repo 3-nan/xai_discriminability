@@ -11,7 +11,7 @@ from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import extract_filename
 
 
-def combine_path(output_dir, attributes, data_name, model_name, layer, rule, partition, class_name):
+def combine_path(output_dir, attributes):
     """ Computes directory path to save computed relevance to. """
 
     # remove backslash at the end
@@ -33,7 +33,7 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
     print("compute explanations for layer(s): {}".format(layer_names))
 
     # init model
-    model = init_model(model_path)
+    model = init_model(model_path, model_name)
 
     # initialize dataset
     dataset = get_dataset(dataset_name)

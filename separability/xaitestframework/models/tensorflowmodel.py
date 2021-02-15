@@ -18,13 +18,13 @@ def custom_init(model, model_path):
 
 class TensorflowModel(ModelInterface):
 
-    def __init__(self, model_path):
+    def __init__(self, model_path, modelname):
         """ Initializes the TensorflowModel object. """
         try:
             self.model = tf.keras.models.load_model(model_path)
         except ValueError:
             self = custom_init(self, model_path)
-        super().__init__(model_path)
+        super().__init__(model_path, modelname)
         print("Model successfully initialized.")
 
     def evaluate(self, data, labels):

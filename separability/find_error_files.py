@@ -1,7 +1,7 @@
 import os
 
 
-dir = "logs-debug"
+dir = "logs-separability"
 
 for filename in os.listdir(dir):
 

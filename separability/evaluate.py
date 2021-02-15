@@ -205,8 +205,8 @@ def evaluate(filepath):
 
                                 if quantification_dict[quantification]["args"]["max_index"]:
                                     job_args = job_args + " -mi " + str(quantification_dict[quantification]["args"]["max_index"])
-                                if quantification_dict[quantification]["args"]["distance_measure"]:
-                                    job_args = job_args + " -dm " + quantification_dict[quantification]["args"]["distance_measure"]
+                                if quantification_dict[quantification]["args"]["distance_measures"]:
+                                    job_args = job_args + " -dm " + ":".join(quantification_dict[quantification]["args"]["distance_measures"])
 
                             # submit
                             if backend == "sge":

@@ -31,7 +31,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     explanationdir = join_path(explanationdir, partition)
 
     # init model
-    model = init_model(model_path)
+    model = init_model(model_path, model_name)
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
@@ -69,19 +69,25 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
 
         data = [sample.image for sample in batch]
 
-        # get/sort indices for pixelflipping order
-        explanations = load_explanations(explanationdir, batch, classidx)
-        # reduce explanations dimension
-        explanations = np.max(explanations, axis=3)
+        if rule != "random":
+            # get/sort indices for pixelflipping order
+            explanations = load_explanations(explanationdir, batch, classidx)
+            # reduce explanations dimension
+            explanations = np.max(explanations, axis=3)         # ToDo make compliant according to method
 
-        print(explanations.shape)
+            print(explanations.shape)
 
-        if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
-            indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
+            if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
+                indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
+            else:
+                indices = [np.argsort(explanation, axis=None) for explanation in explanations]
+
+            indices = np.array(indices)
+
         else:
-            indices = [np.argsort(explanation, axis=None) for explanation in explanations]
-
-        indices = np.array(indices)
+            indices = [np.argsort(np.max(sample, axis=3), axis=None) for sample in data]
+            indices = np.array(indices)
+            np.random.shuffle(indices)
 
         print(indices.shape)
 
