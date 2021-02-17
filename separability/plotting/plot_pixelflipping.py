@@ -11,6 +11,7 @@ filepath = "config.yaml"
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
+    distribution = "gaussian"
     resultdir = "../results/pixelflipping"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
@@ -24,7 +25,10 @@ with open(filepath) as file:
         print(xai_method)
         scores = []
         for classidx in classindices:
-            csv = pd.read_csv(resultdir + "_" + xai_method + "_" + "uniform" + str(classidx) + ".csv")
+            try:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
+            except FileNotFoundError:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
             # print(float(csv["separability_score"]))
             # print(csv)
             percentages = csv["flip_percentage"]
@@ -34,7 +38,7 @@ with open(filepath) as file:
 
         plt.xlabel("percentage of flipped pixels")
         plt.ylabel("score")
-        plt.title(xai_method)
+        plt.title(xai_method + " with {} sampling".format(distribution))
 
         plt.show()
 
@@ -46,7 +50,10 @@ with open(filepath) as file:
         method_scores = []
 
         for classidx in classindices:
-            csv = pd.read_csv(resultdir + "_" + xai_method + "_" + "uniform" + str(classidx) + ".csv")
+            try:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
+            except FileNotFoundError:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
             # print(float(csv["separability_score"]))
             # print(csv)
             percentages = csv["flip_percentage"]
@@ -61,7 +68,7 @@ with open(filepath) as file:
 
     plt.xlabel("percentage of flipped pixels")
     plt.ylabel("score")
-    plt.title("Pixelflipping (class-wise mean)")
+    plt.title("Pixelflipping (class-wise mean) with {} sampling".format(distribution))
     plt.legend(configs["xai_methods"])
 
     plt.show()

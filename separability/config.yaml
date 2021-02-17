@@ -42,7 +42,7 @@ xai_methods:
   - LRPGamma
   - Gradient
   - SmoothGrad
-  - Deconvnet
+  - random
 
 classes:
   - all

@@ -75,28 +75,31 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
                     if distance == "mse":
                         score = (np.square(original_explanation - explanation)).mean(axis=None)
                     elif distance == "cosine":
-                        if len(original_explanation.shape) == 2:
-                            original_explanation = original_explanation.reshape((original_explanation.shape[0]
-                                                                                 * original_explanation.shape[1]))
-                            explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]))
-                        elif len(original_explanation.shape) == 3:
-                            original_explanation = original_explanation.reshape(
-                                (original_explanation.shape[0] * original_explanation.shape[1]
-                                 * original_explanation.shape[2]))
-                            explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]
-                                                               * explanation.shape[2]))
-                        score = cosine(original_explanation, explanation)
+                        # if len(original_explanation.shape) == 2:
+                        #     original_explanation = original_explanation.reshape((original_explanation.shape[0]
+                        #                                                          * original_explanation.shape[1]))
+                        #     explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]))
+                        # elif len(original_explanation.shape) == 3:
+                        #     original_explanation = original_explanation.reshape(
+                        #         (original_explanation.shape[0] * original_explanation.shape[1]
+                        #          * original_explanation.shape[2]))
+                        #     explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]
+                        #                                        * explanation.shape[2]))
+                        score = cosine(np.ravel(original_explanation), np.ravel(explanation))
                     elif distance == "ssim":
-                        score = ssim(original_explanation, explanation)
+                        if len(original_explanation.shape) == 3:
+                            score = ssim(original_explanation, explanation, multichannel=True)
+                        else:
+                            score = ssim(original_explanation, explanation)
                     elif distance == "spearman":
                         score = spearmanr(np.ravel(original_explanation), np.ravel(explanation))[0]
                     elif distance == "hog":
                         if len(original_explanation.shape) == 3:
-                            _, hog_original = hog(original_explanation, multichannel=True)
-                            _, hog_new = hog(explanation, multichannel=True)
+                            hog_original = hog(original_explanation, multichannel=True)
+                            hog_new = hog(explanation, multichannel=True)
                         else:
-                            _, hog_original = hog(original_explanation)
-                            _, hog_new = hog(explanation)
+                            hog_original = hog(original_explanation[:, :, np.newaxis])
+                            hog_new = hog(explanation[:, :, np.newaxis])
                         score = pearsonr(hog_original, hog_new)[0]
                     else:
                         raise NotImplementedError("{} metric not implemented.".format(distance))
@@ -119,7 +122,7 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
         results.append([data_name, model_name, xai_method, str(classidx), layer] + [str(score) for score in list(class_results[layer].values())])
 
     df = pd.DataFrame(results,
-                      columns=['dataset', 'model', 'method', 'classindex', 'layer'] + class_results[layer].keys())
+                      columns=['dataset', 'model', 'method', 'classindex', 'layer'] + list(class_results[layer].keys()))
     df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + "_" + str(classidx) + ".csv"),
               index=False)
 
@@ -161,7 +164,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print("case 1: cascading layer randomization top-down")
     case_output_dir = join_path(output_dir, ["cascading_top_down"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                        explanationdir, case_output_dir, top_down=True, distance=distances)
+                                        explanationdir, case_output_dir, top_down=True, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -170,7 +173,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print("case 2: cascading layer randomization bottom-up")
     case_output_dir = join_path(output_dir, ["cascading_bottom_up"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
-                                        explanationdir, case_output_dir, top_down=False, distance=distances)
+                                        explanationdir, case_output_dir, top_down=False, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -179,7 +182,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print("case 3: independent layer randomization")
     case_output_dir = join_path(output_dir, ["independent"])
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir,
-                                        case_output_dir, top_down=False, independent=True, distance=distances)
+                                        case_output_dir, top_down=False, independent=True, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
                                            case_output_dir)
@@ -235,7 +238,7 @@ if __name__ == "__main__":
                                   ARGS.relevance_datapath,
                                   ARGS.output_dir,
                                   maxidx=ARGS.max_idx,
-                                  distance=ARGS.distance_measure
+                                  distances=ARGS.distance_measure
                                   )
 
     current, peak = tracemalloc.get_traced_memory()

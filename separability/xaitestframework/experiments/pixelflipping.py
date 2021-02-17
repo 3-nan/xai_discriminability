@@ -46,7 +46,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     # collect results and write to file
     results = []
     for key in class_score:
-        results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
+        results.append([data_name, model_name, rule, str(key), str(class_score[key])])
 
     df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
     df.to_csv(
@@ -85,7 +85,7 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
             indices = np.array(indices)
 
         else:
-            indices = [np.argsort(np.max(sample, axis=3), axis=None) for sample in data]
+            indices = [np.argsort(np.max(sample, axis=2), axis=None) for sample in data]
             indices = np.array(indices)
             np.random.shuffle(indices)
 

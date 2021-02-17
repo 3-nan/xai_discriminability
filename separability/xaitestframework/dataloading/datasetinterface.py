@@ -16,6 +16,25 @@ class DataSample(ABC):
 
 
 class Dataset(ABC):
+    """ Abstract Interface for custom datasets.
+    -----------
+    Attributes
+    -----------
+    datapath: str
+        filepath to the dataset
+    partition: str
+        one of the options train or val
+    samples: list
+        list of Datasamples of type DataSample
+    labels: list
+        list of labels assigned to the samples
+    mode: str
+        mode of the dataset to control which attributes of DataSample need to be prepared
+    cmap:   list or dict
+        information to determine a classname to index mapping or vice versa
+    classes: list
+        list of classnames to be used in this dataset object
+    """
 
     def __init__(self, datapath, partition):
         """ Initialize the model. """
@@ -42,6 +61,11 @@ class Dataset(ABC):
             raise ValueError(f"mode {mode} not in the set of valid options")
 
         self.mode = mode
+
+    @abstractmethod
+    def classname_to_idx(self, class_name):
+        """ convert a classname to an index. """
+        return NotImplementedError
 
     # @abstractmethod
     # def get_dataset_partition(self, startidx, endidx, batched=False):

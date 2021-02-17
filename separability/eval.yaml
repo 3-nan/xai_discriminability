@@ -36,16 +36,15 @@ layers:
 
 xai_methods:
   - LRPZ
-#  - LRPAlpha1Beta0
-#  - LRPSequentialCompositeA
-#  - LRPSequentialCompositeBFlat
-#  - LRPGamma
-#  - Gradient
+  - LRPAlpha1Beta0
+  - LRPSequentialCompositeA
+  - LRPSequentialCompositeBFlat
+  - LRPGamma
+  - Gradient
   #- SmoothGrad
 
 classes:
-  - aeroplane
-#  - all
+  - all
 
 quantifications:
 #  - relevance_computation:
@@ -56,7 +55,7 @@ quantifications:
 #          memory_per_job: 5G
   - model_parameter_randomization:
       args:
-          max_index: 400
+          max_index: 300
           distance_measures:
             - cosine
             - ssim
