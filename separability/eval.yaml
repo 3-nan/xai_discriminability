@@ -36,7 +36,7 @@ layers:
 
 xai_methods:
   - LRPZ
-  - LRPAlpha1Beta0
+#  - LRPAlpha1Beta0
   - LRPSequentialCompositeA
   - LRPSequentialCompositeBFlat
   - LRPGamma

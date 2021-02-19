@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import tracemalloc
+import cv2
 
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
@@ -105,14 +106,26 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
             # flip images
             for p, point in enumerate(data):
                 # flip pixels
-                for axis in range(point.shape[2]):
-                    if distribution == "uniform":
-                        random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
-                    elif distribution == "gaussian":
-                        random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
+                if distribution == "inpaint_telea" or distribution == "inpaint_ns":
+                    # build mask
+                    mask = np.zeros(point.shape)
+                    np.put(mask, indicesfraction[p], 1)
+
+                    if distribution == "inpaint_telea":
+                        point = cv2.inpaint(point, mask, 3, cv2.INPAINT_TELEA)
+                    elif distribution == "inpaint_ns":
+                        point = cv2.inpaint(point, mask, 3, cv2.INPAINT_NS)
                     else:
-                        raise ValueError("No distribution for flipping pixels specified.")
-                    np.put_along_axis(point[:, :, axis], indicesfraction[p], random_values, axis=None)
+                        raise ValueError("Error in name of distribution to do inpainting.")
+                else:
+                    for axis in range(point.shape[2]):
+                        if distribution == "uniform":
+                            random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
+                        elif distribution == "gaussian":
+                            random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
+                        else:
+                            raise ValueError("No distribution for flipping pixels specified.")
+                        np.put_along_axis(point[:, :, axis], indicesfraction[p], random_values, axis=None)
 
                 flipped_data.append(point)
 

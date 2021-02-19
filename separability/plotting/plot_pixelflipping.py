@@ -11,7 +11,7 @@ filepath = "config.yaml"
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    distribution = "gaussian"
+    distribution = "uniform"
     resultdir = "../results/pixelflipping"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
