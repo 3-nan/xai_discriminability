@@ -24,7 +24,7 @@ class TensorflowModel(ModelInterface):
             self.model = tf.keras.models.load_model(model_path)
         except ValueError:
             self = custom_init(self, model_path)
-        super().__init__(model_path, modelname)
+        super().__init__(model_path, modelname, "tensorflow")
         print("Model successfully initialized.")
 
     def evaluate(self, data, labels):

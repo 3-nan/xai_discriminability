@@ -10,7 +10,7 @@ import tracemalloc
 
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
-from ..helpers.universal_helper import extract_filename, join_path, compute_relevance_path
+from ..helpers.universal_helper import extract_filename, compute_relevance_path
 
 
 def load_explanations(explanationdir, samples, classidx):

@@ -88,7 +88,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
 
         # randomize layer weights
         if independent:
-            model = init_model(model.path, model.name)
+            model = init_model(model.path, model.name, framework=model.type)
 
         model = model.randomize_layer_weights(layer_name)
 
@@ -147,7 +147,8 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
               index=False)
 
 
-def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size, model_path, model_name,
+def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size,
+                                  model_path, model_name, model_type,
                                   bottom_layer, xai_method, explanationdir, output_dir, maxidx=None, distances=None):
     """ Function to create explanations on randomized models. """
 
@@ -156,7 +157,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
         distances = ["cosine"]
 
     # init model
-    model = init_model(model_path, model_name)
+    model = init_model(model_path, model_name, framework=model_type)
 
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
 
@@ -225,6 +226,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
     parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
     parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-mt", "--model_type", type=str, default=None, help="AI Framework to use (tensorflow, pytorch")
     parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
     parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
@@ -253,6 +255,7 @@ if __name__ == "__main__":
                                   ARGS.batch_size,
                                   ARGS.model_path,
                                   ARGS.model_name,
+                                  ARGS.model_type,
                                   ARGS.layer[0],
                                   ARGS.rule,
                                   ARGS.relevance_datapath,

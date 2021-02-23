@@ -25,7 +25,7 @@ def load_explanations(explanationdir, samples, classidx):
     return np.array(explanations)
 
 
-def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, layer_name, rule, distribution, output_dir, percentage_values):
+def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values):
     """ Wrapper function to load data/model and compute directory paths. """
 
     # construct explanationdir
@@ -33,7 +33,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     explanationdir = os.path.join(explanationdir, partition)
 
     # init model
-    model = init_model(model_path, model_name)
+    model = init_model(model_path, model_name, framework=model_type)
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
@@ -161,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
     parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
     parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-mt", "--model_type", type=str, default=None, help="AI Framework to use (tensorflow, pytorch")
     parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
     parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")
@@ -190,6 +191,7 @@ if __name__ == "__main__":
                           ARGS.batch_size,
                           ARGS.model_path,
                           ARGS.model_name,
+                          ARGS.model_type,
                           ARGS.layer,
                           ARGS.rule,
                           ARGS.distribution,

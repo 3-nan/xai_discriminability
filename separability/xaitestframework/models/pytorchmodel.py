@@ -56,7 +56,7 @@ class PytorchModel(ModelInterface):
                     self.layer_names["linear" + str(linear_counter)] = layer
                     linear_counter += 1
 
-        super().__init__(model_path, modelname)
+        super().__init__(model_path, modelname, "pytorch")
         print("Model successfully initialized.")
 
     def evaluate(self, data, labels):

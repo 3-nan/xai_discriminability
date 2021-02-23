@@ -74,6 +74,7 @@ def submit_on_ubuntu(data, model, layers, xai_method, label, index, explanationd
                                 data['batchsize'],
                                 model['modelpath'],
                                 model['modelname'],
+                                model['modeltype'],
                                 layers,
                                 xai_method,
                                 label,
@@ -133,6 +134,7 @@ def evaluate(filepath):
 
         base_args += " -m " + modelpath
         base_args += " -mn " + modelname
+        base_args += " -mt " + modeltype
 
         dataset = get_dataset(dataset)
         dataset = dataset(datapath, partition)

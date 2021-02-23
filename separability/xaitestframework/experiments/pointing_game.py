@@ -124,15 +124,15 @@ if __name__ == "__main__":
     tracemalloc.start()
 
     estimate_pointing_game_score(ARGS.data_path,
-                             ARGS.data_name,
-                             ARGS.dataset_name,
-                             ARGS.relevance_datapath,
-                             ARGS.partition,
-                             ARGS.batch_size,
-                             ARGS.model_name,
-                             ARGS.layer,
-                             ARGS.rule,
-                             ARGS.output_dir)
+                                 ARGS.data_name,
+                                 ARGS.dataset_name,
+                                 ARGS.relevance_datapath,
+                                 ARGS.partition,
+                                 ARGS.batch_size,
+                                 ARGS.model_name,
+                                 ARGS.layer,
+                                 ARGS.rule,
+                                 ARGS.output_dir)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10 ** 6}MB; Peak was {peak / 10 ** 6}MB")
