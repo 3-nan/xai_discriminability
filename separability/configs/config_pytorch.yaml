@@ -1,0 +1,91 @@
+# config.yaml file
+
+system_config:
+  backend: sge # ubuntu
+  conda: conda
+  environment: separability
+  threads: 5
+
+data:
+  datapath: /data/cluster/users/motzkus/data/VOC2012/
+  dataname: voc2012
+  datasetobject: VOC2012Dataset
+  partition: train  # might delete to enable simultaneous computation on train/val dataset
+  batchsize: 50
+
+model:
+  modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
+  modelname: vgg16
+  modeltype: pytorch
+
+dirs:
+  logdir: logs-pytorch/
+  scriptdir: scripts-pytorch/
+  explanationdir: /data/cluster/users/motzkus/relevance_maps
+  outputdir: /data/cluster/users/motzkus/results
+
+layers:
+  - input_1
+#  - block1_conv1
+#  - block2_conv1
+#  - block3_conv1
+#  - block4_conv1
+#  - block5_conv1
+#  - fc1
+#  - fc2
+
+xai_methods:
+#  - LRPZ
+##  - LRPAlpha1Beta0
+#  - LRPSequentialCompositeA
+#  - LRPSequentialCompositeBFlat
+#  - LRPGamma
+#  - Gradient
+#  #- SmoothGrad
+  - IntegratedGradients
+
+classes:
+#  - all
+  - aeroplane
+
+quantifications:
+  - attribution_computation:
+      config:
+          memory_per_job: 20G
+#  - attribution_localization:
+#      config:
+#          memory_per_job: 5G
+#  - pixelflipping:
+#      args:
+#          percentages:
+#            - 0.0
+#            - 0.02
+#            - 0.04
+#            - 0.06
+#            - 0.08
+#            - 0.1
+#            - 0.2
+#            - 0.3
+#            - 0.4
+#            - 0.5
+#          distribution: gaussian   # uniform, gaussian
+#      config:
+#          memory_per_job: 5G
+#  - pointing_game:
+#      args:
+#      config:
+#          memory_per_job: 3G
+#  - model_parameter_randomization:
+#      args:
+#          max_index: 300
+#          distance_measures:
+#            - cosine
+#            - ssim
+#            - spearman
+#            - hog
+#      config:
+#          memory_per_job: 22G
+#  - one_class_separability:
+#      args:
+#      config:
+#          memory_per_job: 5G

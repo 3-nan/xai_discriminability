@@ -23,7 +23,7 @@ def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
     execthis += ['{} deactivate'.format(configs['system_config']['conda'])]  # leave venv
     execthis = '\n'.join(execthis)
 
-    JOBNAME = '[{}_of_{}]_of_"{}"'.format(index + 1, "X", quantification_method)
+    JOBNAME = '[{}]_of_"{}"'.format(index + 1, quantification_method)
     SCRIPTFILE = '{}/{}-{}'.format(configs['dirs']['scriptdir'], quantification_method, index + 1)
     print('    as file: {}'.format(SCRIPTFILE))
     print('    as name: {}'.format(JOBNAME))

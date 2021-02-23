@@ -4,23 +4,24 @@ import torchvision.models as models
 import captum
 
 from .modelinterface import ModelInterface
-# from ..helpers.analyzer_helper import parse_xai_method
-# from ..experiments import innvestigate
+
+
+CAPTUM_DICT = {
+    "IntegratedGradients": captum.attr.IntegratedGradients,
+    "GradientAttribution": captum.attr.GradientAttribution,
+    "Deconvolution": captum.attr.Deconvolution,
+    "Lime": captum.attr.Lime
+}
 
 
 def parse_captum_method(xai_method, additional_parameter=None):
     """ Parse method name to captum method. """
-    if xai_method == "IntegratedGradients":
-        method = captum.attr.IntegratedGradients
-    elif xai_method == "GradientAttribution":
-        method = captum.attr.GradientAttribution
-    elif xai_method == "Deconvolution":
-        method = captum.attr.Deconvolution
-    elif xai_method == "Lime":
-        method = captum.attr.Lime
-    else:
-        raise NotImplementedError("Method {} is not implemented/may needs to be added manually.".format(xai_method))
-
+    try:
+        method = CAPTUM_DICT[xai_method]
+    except KeyError:
+        # print("analyzer name {} not correct".format(xai_method))
+        # analyzer = None
+        raise ValueError("Analyzer name {} not correct.".format(xai_method))
     return method
 
 
@@ -104,14 +105,6 @@ class PytorchModel(ModelInterface):
 
     def compute_relevance(self, batch, layer_names, neuron_selection, xai_method, additional_parameter=None):
         """ Compute relevance maps for the provided data batch. """
-
-        # initialize analyzer
-        # if isinstance(self.model.layers[-1], tf.keras.layers.Activation):
-        #     model_wo_softmax = tf.keras.models.Model(inputs=self.model.inputs,
-        #                                              outputs=self.model.layers[-2].output,
-        #                                              name=self.model.name)
-        # else:
-        #     model_wo_softmax = innvestigate.utils.keras.graph.model_wo_softmax(self.model)
 
         analyzer = parse_captum_method(xai_method, additional_parameter=additional_parameter)
         ana = analyzer(self.model)

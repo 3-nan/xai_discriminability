@@ -3,7 +3,8 @@ import sys
 import collections
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+import cv2
+# import tensorflow as tf
 from xml.etree import ElementTree
 import xmltodict
 
@@ -195,10 +196,14 @@ class VOC2012Dataset(Dataset):
 
     def preprocess_image(self, image):
 
-        image_string = tf.io.read_file(image)
-        image_decoded = tf.io.decode_jpeg(image_string, channels=3)
-        image_resized = tf.image.resize(image_decoded, [224, 224]).numpy()
-        image_normalized = image_resized / 127.5 - 1.0
+        read_image = cv2.imread(image, cv2.IMREAD_COLOR)
+        image_resized = cv2.resize(read_image, (224, 224), interpolation=cv2.INTER_CUBIC)
+        image_normalized = image_resized.astype(np.float32) / 127.5 - 1.0
+
+        # image_string = tf.io.read_file(image)
+        # image_decoded = tf.io.decode_jpeg(image_string, channels=3)
+        # image_resized = tf.image.resize(image_decoded, [224, 224]).numpy()
+        # image_normalized = image_resized / 127.5 - 1.0
 
         return image_normalized
 
@@ -251,6 +256,8 @@ class VOC2012Dataset(Dataset):
 
         # preprocess binary masks to fit shape of image data
         for key in binary_mask.keys():
-            binary_mask[key] = tf.image.resize(binary_mask[key][:, :, np.newaxis], [224, 224]).numpy().astype(int)
+            # binary_mask[key] = tf.image.resize(binary_mask[key][:, :, np.newaxis], [224, 224]).numpy().astype(int)
+            binary_mask[key] = cv2.resize(binary_mask[key][:, :, np.newaxis], [224, 224], interpolation=cv2.INTER_CUBIC).astype(np.int)
+
 
         return binary_mask
