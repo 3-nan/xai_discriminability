@@ -1,7 +1,7 @@
 # This is an example of using the xaitestframework
 from xaitestframework.dataloading.custom import get_dataset
 from xaitestframework.helpers.model_helper import init_model
-from xaitestframework.experiments.relevance_computation import combine_path, compute_explanations_for_class
+from xaitestframework.experiments.attribution_computation import combine_path, compute_explanations_for_class
 
 #######################################
 # example for explanation computation #

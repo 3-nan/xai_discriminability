@@ -4,9 +4,8 @@ import math
 import yaml
 import subprocess
 
-from xaitestframework.experiments.relevance_computation import compute_relevances_for_class
+from xaitestframework.experiments.attribution_computation import compute_attribution_wrapper
 from xaitestframework.dataloading.custom import get_dataset
-from xaitestframework.helpers.universal_helper import join_path
 
 
 def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
@@ -68,17 +67,17 @@ def submit_on_ubuntu(data, model, layers, xai_method, label, index, explanationd
     """ Submit a job on an ubuntu workstation. """
 
     print("Starting job {}".format(index))
-    compute_relevances_for_class(data['datapath'],
-                                 data['dataname'],
-                                 data['datasetobject'],
-                                 data['partition'],
-                                 data['batchsize'],
-                                 model['modelpath'],
-                                 model['modelname'],
-                                 layers,
-                                 xai_method,
-                                 label,
-                                 explanationdir)
+    compute_attribution_wrapper(data['datapath'],
+                                data['dataname'],
+                                data['datasetobject'],
+                                data['partition'],
+                                data['batchsize'],
+                                model['modelpath'],
+                                model['modelname'],
+                                layers,
+                                xai_method,
+                                label,
+                                explanationdir)
 
     print("Finished job {}".format(index))
 
@@ -143,7 +142,7 @@ def evaluate(filepath):
             classes = dataset.classes
 
         # add quantification specific arguments
-        if list(quantifications[0].keys())[0] == "relevance_computation":
+        if list(quantifications[0].keys())[0] == "attribution_computation":
 
             job_size = 1000  # number of images to process per job
             job_index = 0
@@ -162,8 +161,8 @@ def evaluate(filepath):
                         for i in range(math.ceil(len(dataset) / job_size)):
                             job_args = args + " -si " + str(i * job_size) + " -ei " + str((i + 1) * job_size)
 
-                            submit_on_sungrid(job_args, configs, quantifications[0]["relevance_computation"]["config"],
-                                              "relevance_computation", job_index)       # ToDo
+                            submit_on_sungrid(job_args, configs, quantifications[0]["attribution_computation"]["config"],
+                                              "attribution_computation", job_index)       # ToDo
                             job_index += 1
 
                     elif backend == "ubuntu":
@@ -176,7 +175,7 @@ def evaluate(filepath):
                 quantification = list(quantification_dict.keys())[0]
                 print(quantification)
 
-                method_output_dir = join_path(outputdir, quantification)
+                method_output_dir = os.path.join(outputdir, quantification)
                 method_args = base_args + " -o " + method_output_dir
 
                 if not os.path.isdir(method_output_dir):

@@ -27,7 +27,7 @@ def combine_path(output_dir, attributes):
     return output_dir
 
 
-def compute_relevances_for_class(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
+def compute_attribution_wrapper(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Wrapper Function to compute the attributed relevances for the selected class. """
 
     print("compute explanations for layer(s): {}".format(layer_names))
@@ -42,11 +42,11 @@ def compute_relevances_for_class(data_path, data_name, dataset_name, partition, 
     # compute/create output dir
     output_dir = combine_path(output_dir, [data_name, model_name])
 
-    compute_explanations_for_class(dataset, partition, batch_size, model, layer_names,
+    compute_attributions_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=startidx, endidx=endidx)
 
 
-def compute_explanations_for_class(dataset, partition, batch_size, model, layer_names,
+def compute_attributions_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Computes the explanations for the selected class and saves them to output dir. """
     dataset.set_mode("preprocessed")
@@ -109,20 +109,20 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    compute_relevances_for_class(ARGS.data_path,
-                                 ARGS.data_name,
-                                 ARGS.dataset_name,
-                                 ARGS.partition,
-                                 ARGS.batch_size,
-                                 ARGS.model_path,
-                                 ARGS.model_name,
-                                 ARGS.layer_names,
-                                 ARGS.rule,
-                                 ARGS.class_label,
-                                 ARGS.relevance_datapath,
-                                 startidx=ARGS.start_index,
-                                 endidx=ARGS.end_index
-                                 )
+    compute_attribution_wrapper(ARGS.data_path,
+                                ARGS.data_name,
+                                ARGS.dataset_name,
+                                ARGS.partition,
+                                ARGS.batch_size,
+                                ARGS.model_path,
+                                ARGS.model_name,
+                                ARGS.layer_names,
+                                ARGS.rule,
+                                ARGS.class_label,
+                                ARGS.relevance_datapath,
+                                startidx=ARGS.start_index,
+                                endidx=ARGS.end_index
+                                )
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
