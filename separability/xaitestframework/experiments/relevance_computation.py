@@ -55,11 +55,11 @@ def compute_explanations_for_class(dataset, partition, batch_size, model, layer_
 
     for batch in dataloader:
 
-        # extract preprocessed images
-        imgs = [sample.image for sample in batch]
+        # extract preprocessed data
+        data = [sample.datum for sample in batch]
 
         # compute relevance
-        R = model.compute_relevance(imgs, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
+        R = model.compute_relevance(data, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
 
         for layer_name in layer_names:
             layer_output_dir = combine_path(output_dir, [layer_name, xai_method, partition, str(class_name)])

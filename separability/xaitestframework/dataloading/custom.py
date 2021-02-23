@@ -96,8 +96,8 @@ class ImagenetDataset(Dataset):
 class VOC2012Sample(DataSample):
     """ Implements a pascal voc 2012 sample. """
 
-    def __init__(self, image, filename, label, one_hot_label, binary_mask):
-        super().__init__(image, filename)
+    def __init__(self, datum, filename, label, one_hot_label, binary_mask):
+        super().__init__(datum, filename)
         self.label = label
         self.one_hot_label = one_hot_label
         self.binary_mask = binary_mask

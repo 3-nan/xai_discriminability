@@ -12,10 +12,53 @@ import pandas as pd
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
 from ..helpers.model_helper import init_model
-from ..helpers.universal_helper import extract_filename, compute_relevance_path, join_path
+from ..helpers.universal_helper import extract_filename, compute_relevance_path
 
 
-# implement layer randomization
+#######################################
+# implementation of distance measures #
+#######################################
+def mse_distance(explanation, original_explanation):
+    return (np.square(original_explanation - explanation)).mean(axis=None)
+
+
+def cosine_distance(explanation, original_explanation):
+    return cosine(np.ravel(original_explanation), np.ravel(explanation))
+
+
+def ssim_distance(explanation, original_explanation):
+    if len(original_explanation.shape) == 3:
+        return ssim(original_explanation, explanation, multichannel=True)
+    else:
+        return ssim(original_explanation, explanation)
+
+
+def spearman_distance(explanation, original_explanation):
+    return spearmanr(np.ravel(original_explanation), np.ravel(explanation))[0]
+
+
+def hog_distance(explanation, original_explanation):
+    if len(original_explanation.shape) == 3:
+        hog_original = hog(original_explanation, multichannel=True)
+        hog_new = hog(explanation, multichannel=True)
+    else:
+        hog_original = hog(original_explanation[:, :, np.newaxis])
+        hog_new = hog(explanation[:, :, np.newaxis])
+    return pearsonr(hog_original, hog_new)[0]
+
+
+DISTANCES = {
+    "mse": mse_distance,
+    "cosine": cosine_distance,
+    "ssim": ssim_distance,
+    "spearman": spearman_distance,
+    "hog": hog_distance
+}
+
+
+#################################
+# implement layer randomization #
+#################################
 def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir, output_dir,
                         top_down=True, independent=False, distances=None):
 
@@ -23,10 +66,10 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
         distances = ["cosine"]
 
     # configure save dir
-    if not os.path.exists(join_path(output_dir, "explanations")):
-        os.makedirs(join_path(output_dir, "explanations"))
+    if not os.path.exists(os.path.join(output_dir, "explanations")):
+        os.makedirs(os.path.join(output_dir, "explanations"))
 
-    output_dir = join_path(output_dir, "explanations")
+    # output_dir = join_path(output_dir, "explanations")
 
     # get layers including weights and iterate them
     layer_names = model.get_layer_names(with_weights_only=True)
@@ -51,10 +94,10 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
 
         # iterate data and compute explanations
         for batch in dataloader:
-            imgs = [sample.image for sample in batch]
+            data = [sample.datum for sample in batch]
             # labels = [sample.one_hot_label for sample in batch]
 
-            explanations = model.compute_relevance(imgs, [bottom_layer], neuron_selection=int(classidx),
+            explanations = model.compute_relevance(data, [bottom_layer], neuron_selection=int(classidx),
                                                    xai_method=xai_method, additional_parameter=None)
 
             # save explanations and compute diff to original explanation
@@ -64,7 +107,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
                 # np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation) # ToDo: save some explanations for visual inspection
 
                 # compute similarity
-                original_explanation = np.load(join_path(explanationdir, ["val", str(classidx), extract_filename(batch[i].filename)]) + ".npy")
+                original_explanation = np.load(os.path.join(explanationdir, "val", str(classidx), extract_filename(batch[i].filename)) + ".npy")
 
                 # normalize explanations
                 original_explanation = original_explanation / np.max(original_explanation)
@@ -72,37 +115,14 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
 
                 for distance in distances:
 
-                    if distance == "mse":
-                        score = (np.square(original_explanation - explanation)).mean(axis=None)
-                    elif distance == "cosine":
-                        # if len(original_explanation.shape) == 2:
-                        #     original_explanation = original_explanation.reshape((original_explanation.shape[0]
-                        #                                                          * original_explanation.shape[1]))
-                        #     explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]))
-                        # elif len(original_explanation.shape) == 3:
-                        #     original_explanation = original_explanation.reshape(
-                        #         (original_explanation.shape[0] * original_explanation.shape[1]
-                        #          * original_explanation.shape[2]))
-                        #     explanation = explanation.reshape((explanation.shape[0] * explanation.shape[1]
-                        #                                        * explanation.shape[2]))
-                        score = cosine(np.ravel(original_explanation), np.ravel(explanation))
-                    elif distance == "ssim":
-                        if len(original_explanation.shape) == 3:
-                            score = ssim(original_explanation, explanation, multichannel=True)
-                        else:
-                            score = ssim(original_explanation, explanation)
-                    elif distance == "spearman":
-                        score = spearmanr(np.ravel(original_explanation), np.ravel(explanation))[0]
-                    elif distance == "hog":
-                        if len(original_explanation.shape) == 3:
-                            hog_original = hog(original_explanation, multichannel=True)
-                            hog_new = hog(explanation, multichannel=True)
-                        else:
-                            hog_original = hog(original_explanation[:, :, np.newaxis])
-                            hog_new = hog(explanation[:, :, np.newaxis])
-                        score = pearsonr(hog_original, hog_new)[0]
-                    else:
+                    try:
+                        # get distance function from dictionary
+                        distance_function = DISTANCES[distance]
+                    except KeyError:
                         raise NotImplementedError("{} metric not implemented.".format(distance))
+
+                    # compute distance value and append
+                    score = distance_function(explanation, original_explanation)
                     diff[distance].append(score)
 
         # compute results and save to dict
@@ -123,7 +143,7 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
     df = pd.DataFrame(results,
                       columns=['dataset', 'model', 'method', 'classindex', 'layer'] + list(class_results[layer].keys()))
-    df.to_csv(join_path(outputdir, data_name + "_" + model_name + "_" + xai_method + "_" + str(classidx) + ".csv"),
+    df.to_csv(os.path.join(outputdir, "{}_{}_{}_{}.csv".format(data_name, model_name, xai_method, str(classidx))),
               index=False)
 
 
@@ -141,10 +161,10 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
 
     # configure directories
-    if not os.path.exists(join_path(output_dir, "cascading_top_down")):
-        os.makedirs(join_path(output_dir, "cascading_top_down"))
-        os.makedirs(join_path(output_dir, "cascading_bottom_up"))
-        os.makedirs(join_path(output_dir, "independent"))
+    if not os.path.exists(os.path.join(output_dir, "cascading_top_down")):
+        os.makedirs(os.path.join(output_dir, "cascading_top_down"))
+        os.makedirs(os.path.join(output_dir, "cascading_bottom_up"))
+        os.makedirs(os.path.join(output_dir, "independent"))
 
     print("iteration for class index {}".format(classidx))
 
@@ -162,7 +182,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 1: cascading layer randomization top-down
     print("case 1: cascading layer randomization top-down")
-    case_output_dir = join_path(output_dir, ["cascading_top_down"])
+    case_output_dir = os.path.join(output_dir, "cascading_top_down")
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                         explanationdir, case_output_dir, top_down=True, distances=distances)
     # save results
@@ -171,7 +191,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 2: cascading layer randomization bottom-up
     print("case 2: cascading layer randomization bottom-up")
-    case_output_dir = join_path(output_dir, ["cascading_bottom_up"])
+    case_output_dir = os.path.join(output_dir, "cascading_bottom_up")
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
                                         explanationdir, case_output_dir, top_down=False, distances=distances)
     # save results
@@ -180,7 +200,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
 
     # CASE 3: independent layer randomization
     print("case 3: independent layer randomization")
-    case_output_dir = join_path(output_dir, ["independent"])
+    case_output_dir = os.path.join(output_dir, "independent")
     class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir,
                                         case_output_dir, top_down=False, independent=True, distances=distances)
     # save results

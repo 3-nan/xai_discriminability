@@ -1,17 +1,12 @@
-import collections
-import xml
-import xmltodict
-import numpy as np
-import tensorflow as tf
 from abc import ABC, abstractmethod
 
 
 class DataSample(ABC):
     """ Represents a single sample of a dataset. """
 
-    def __init__(self, image, filename):
+    def __init__(self, datum, filename):
         """ Initializes a new DataSample instance. """
-        self.image = image
+        self.datum = datum
         self.filename = filename
 
 

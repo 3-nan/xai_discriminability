@@ -68,7 +68,7 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
     # iterate data
     for batch in dataloader:
 
-        data = [sample.image for sample in batch]
+        data = [sample.datum for sample in batch]
 
         if rule != "random":
             # get/sort indices for pixelflipping order

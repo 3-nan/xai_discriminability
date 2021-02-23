@@ -136,7 +136,7 @@ def load_voc2012():
     return dataset
 
 
-dataset = load_voc2012()
+# dataset = load_voc2012()
 
 
 def load_imagenet_manual():
