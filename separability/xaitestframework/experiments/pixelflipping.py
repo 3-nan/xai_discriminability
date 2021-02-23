@@ -1,3 +1,4 @@
+import os
 import argparse
 import time
 import numpy as np
@@ -8,7 +9,7 @@ import cv2
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
 from ..helpers.model_helper import init_model
-from ..helpers.universal_helper import compute_relevance_path, extract_filename, join_path
+from ..helpers.universal_helper import compute_relevance_path, extract_filename
 
 
 def load_explanations(explanationdir, samples, classidx):
@@ -16,10 +17,10 @@ def load_explanations(explanationdir, samples, classidx):
 
     explanations = []
 
-    explanationdir = join_path(explanationdir, str(classidx))
+    explanationdir = os.path.join(explanationdir, str(classidx))
 
     for sample in samples:
-        explanations.append(np.load(join_path(explanationdir, extract_filename(sample.filename)) + ".npy"))
+        explanations.append(np.load(os.path.join(explanationdir, extract_filename(sample.filename)) + ".npy"))
 
     return np.array(explanations)
 
@@ -29,7 +30,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
 
     # construct explanationdir
     explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
-    explanationdir = join_path(explanationdir, partition)
+    explanationdir = os.path.join(explanationdir, partition)
 
     # init model
     model = init_model(model_path, model_name)
@@ -51,7 +52,7 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
 
     df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
     df.to_csv(
-        join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + "_" + str(classidx) + ".csv",
+        os.path.join(output_dir, "{}_{}_{}_{}_{}.csv".format(data_name, model_name, rule, distribution, str(classidx))),
         index=False)
 
 
@@ -139,13 +140,6 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
 
     for percentage in percentage_values:
         class_score[percentage] = np.mean(np.concatenate(class_score[percentage]))
-    # # collect results and write to file
-    # results = []
-    # for key in class_score:
-    #     results.append([data_name, model_name, rule, str(key), str(np.mean(np.concatenate(class_score[key])))])
-    #
-    # df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
-    # df.to_csv(join_path(output_dir, data_name) + "_" + model_name + "_" + rule + "_" + distribution + str(classidx) + ".csv", index=False)
 
     return class_score
 

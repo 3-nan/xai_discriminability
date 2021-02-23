@@ -20,10 +20,10 @@ def load_explanations(explanationdir, samples, classidx):
 
     if isinstance(classidx, list):
         for s, sample in enumerate(samples):
-            explanations.append(np.load(join_path(explanationdir, [str(classidx[s]), extract_filename(sample.filename)]) + ".npy"))
+            explanations.append(np.load(os.path.join(explanationdir, str(classidx[s]), extract_filename(sample.filename)) + ".npy"))
     else:
         for s, sample in enumerate(samples):
-            explanations.append(np.load(join_path(explanationdir, [str(classidx), extract_filename(sample.filename)]) + ".npy"))
+            explanations.append(np.load(os.path.join(explanationdir, str(classidx), extract_filename(sample.filename)) + ".npy"))
 
     explanations = np.array(explanations)
 
@@ -105,7 +105,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         # load relevance maps from train partition to train clf
         Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
-                                                        join_path(relevance_path, "train"))
+                                                        os.path.join(relevance_path, "train"))
 
         print(Rc_data.shape)
         print(labels.shape)
@@ -125,7 +125,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         testloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
         Rc_test, test_labels = load_explanation_data_for_svc(testloader, classidx, class_indices,
-                                                             join_path(relevance_path, "val"))
+                                                             os.path.join(relevance_path, "val"))
 
         print(Rc_test.shape)
 
@@ -144,14 +144,14 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         print("separability score for class {}".format(classidx))
         print(score)
 
-        resultdir = join_path(output_dir, data_name + "_" + model_name)
+        resultdir = os.path.join(output_dir, "{}_{}".format(data_name, model_name))
 
         if not os.path.exists(resultdir):
             os.makedirs(resultdir)
 
         df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
                           columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
-        df.to_csv(resultdir + "/" + layer_name + "_" + rule + "_" + str(classidx) + ".csv", index=False)
+        df.to_csv("{}/{}_{}_{}.csv".format(resultdir, layer_name, rule, str(classidx)), index=False)
 
 
 if __name__ == "__main__":

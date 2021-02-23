@@ -3,7 +3,7 @@ import os
 
 def extract_filename(string):
     """ Remove path to file and file ending. """
-    return os.path.splitext(string)[0].split("/")[-1]
+    return os.path.splitext(os.path.basename(string))[0]
 
 
 def join_path(path, dirs):

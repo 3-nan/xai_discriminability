@@ -1,3 +1,4 @@
+import os
 import argparse
 import numpy as np
 import time
@@ -6,14 +7,14 @@ import pandas as pd
 
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
-from ..helpers.universal_helper import compute_relevance_path, join_path, extract_filename
+from ..helpers.universal_helper import compute_relevance_path, extract_filename
 
 
 def get_explanation(relevance_path, data_name, model_name, layer, xai_method, filename, label):
     """ Load explanation for given filename and label. """
     filename = extract_filename(filename)
     explanation_dir = compute_relevance_path(relevance_path, data_name, model_name, layer, xai_method)
-    fname = join_path(explanation_dir, ["val", str(label), filename])
+    fname = os.path.join(explanation_dir, "val", str(label), filename)
 
     explanation = np.load(fname + ".npy")
     return explanation
@@ -87,7 +88,7 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
 
     df = pd.DataFrame(results,
                       columns=['dataset', 'model', 'method', 'total_score', 'weighted score'])
-    df.to_csv(join_path(output_dir, data_name + "_" + model_name + "_" + xai_method + ".csv"), index=False)
+    df.to_csv(os.path.join(output_dir, "{}_{}_{}.csv".format(data_name, model_name, xai_method)), index=False)
 
 
 if __name__ == "__main__":

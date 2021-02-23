@@ -65,7 +65,7 @@ def compute_explanations_for_class(dataset, partition, batch_size, model, layer_
             layer_output_dir = combine_path(output_dir, [layer_name, xai_method, partition, str(class_name)])
             for r, relevance in enumerate(R[layer_name]):
                 fname = extract_filename(batch[r].filename)
-                filename = layer_output_dir + "/" + fname + ".npy"
+                filename = os.path.join(layer_output_dir, fname + ".npy")
                 np.save(filename, relevance)
 
 
