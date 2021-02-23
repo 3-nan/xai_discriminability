@@ -1,40 +1,27 @@
 from ..experiments import innvestigate
 
 
+INNVESTIGATE_DICT = {
+    "Gradient": innvestigate.analyzer.Gradient,
+    "SmoothGrad": innvestigate.analyzer.SmoothGrad,
+    "LRPZ": innvestigate.analyzer.LRPZ,
+    "LRPEpsilon": innvestigate.analyzer.LRPEpsilon,
+    "LRPWSquare": innvestigate.analyzer.LRPWSquare,
+    "LRPGamma": innvestigate.analyzer.LRPGamma,
+    "LRPAlpha1Beta0": innvestigate.analyzer.LRPAlpha1Beta0,
+    "LRPAlpha2Beta1": innvestigate.analyzer.LRPAlpha2Beta1,
+    "LRPSequentialPresetA": innvestigate.analyzer.LRPSequentialPresetA,
+    "LRPSequentialPresetB": innvestigate.analyzer.LRPSequentialPresetB,
+    "LRPSequentialCompositeBFlat": innvestigate.analyzer.LRPSequentialCompositeBFlat
+}
+
+
 def parse_xai_method(xai_method, additional_parameter=None):
     """ Parses the method name to the correct innvestigate Analyzer. """
-    # Gradient methods
-    if xai_method == "Gradient":
-        analyzer = innvestigate.analyzer.Gradient
-    elif xai_method == "SmoothGrad":
-        analyzer = innvestigate.analyzer.SmoothGrad
-    elif xai_method == "Deconvnet":
-        analyzer = innvestigate.analyzer.Deconvnet
-    # LRP methods
-    elif xai_method == "LRPZ":
-        analyzer = innvestigate.analyzer.LRPZ
-    elif xai_method == 'LRPEpsilon':
-        analyzer = innvestigate.analyzer.LRPEpsilon
-    elif xai_method == 'LRPWSquare':
-        analyzer = innvestigate.analyzer.LRPWSquare
-    elif xai_method == 'LRPGamma':
-        analyzer = innvestigate.analyzer.LRPGamma
-    elif xai_method == 'LRPAlpha1Beta0':
-        analyzer = innvestigate.analyzer.LRPAlpha1Beta0
-    elif xai_method == 'LRPAlpha2Beta1':
-        analyzer = innvestigate.analyzer.LRPAlpha2Beta1
-    elif xai_method == 'LRPSequentialPresetA':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetA
-    elif xai_method == 'LRPSequentialPresetB':
-        analyzer = innvestigate.analyzer.LRPSequentialPresetB
-    elif xai_method == 'LRPSequentialCompositeA':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeA
-    elif xai_method == 'LRPSequentialCompositeB':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeB
-    elif xai_method == 'LRPSequentialCompositeBFlat':
-        analyzer = innvestigate.analyzer.LRPSequentialCompositeBFlat
-
-    else:
-        print("analyzer name " + xai_method + " not correct")
-        analyzer = None
+    try:
+        analyzer = INNVESTIGATE_DICT[xai_method]
+    except KeyError:
+        # print("analyzer name {} not correct".format(xai_method))
+        # analyzer = None
+        raise ValueError("Analyzer name {} not correct.".format(xai_method))
     return analyzer
