@@ -1,16 +1,17 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-import captum
+from captum.attr import Deconvolution, GradientAttribution, IntegratedGradients, Lime
+
 
 from .modelinterface import ModelInterface
 
 
 CAPTUM_DICT = {
-    "IntegratedGradients": captum.attr.IntegratedGradients,
-    "GradientAttribution": captum.attr.GradientAttribution,
-    "Deconvolution": captum.attr.Deconvolution,
-    "Lime": captum.attr.Lime
+    "IntegratedGradients": IntegratedGradients,
+    "GradientAttribution": GradientAttribution,
+    "Deconvolution": Deconvolution,
+    "Lime": Lime
 }
 
 
@@ -33,15 +34,24 @@ def get_pytorch_model(modelname):
         "inception": models.inception_v3
     }
 
-    return modeldict[modelname]()
+    model = modeldict[modelname]()
+
+    # adapt last layer
+    model.classifier[-1] = nn.Linear(4096, 20)
+
+    return model
 
 
 class PytorchModel(ModelInterface):
 
     def __init__(self, model_path, modelname):
         """ Initializes the TensorflowModel object. """
+        # set device
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        # init
         self.model = get_pytorch_model(modelname)
-        self.model.load_state_dict(torch.load(model_path))
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
 
         # build layer name dictionary
@@ -58,17 +68,18 @@ class PytorchModel(ModelInterface):
                     linear_counter += 1
 
         super().__init__(model_path, modelname, "pytorch")
-        print("Model successfully initialized.")
+        print("Model successfulldatay initialized.")
 
     def evaluate(self, data, labels):
         """ Evaluates the model on the given data. """
-        outputs = self.model(data)                      # ToDo: evaluation methods might change and might be only applicable to whole datasets
+        outputs = self.model(torch.as_tensor(data, device=self.device))                      # ToDo: evaluation methods might change and might be only applicable to whole datasets
         return self.model.evaluate(data, labels)
 
     def predict(self, data, batch_size=None):
         """ Compute predictions for the given data. """
-        outputs = self.model(data)                      # ToDo: implement usage of batch size, implement prediction
-        return outputs
+        data_tensor = torch.as_tensor(data, device=self.device).permute(0, 3, 1, 2)
+        outputs = self.model(data_tensor)          # ToDo: implement usage of batch size, implement prediction
+        return outputs.detach().numpy()
 
     def get_layer_names(self, with_weights_only=False):
         """ Returns the layer names of the model. """
@@ -110,7 +121,9 @@ class PytorchModel(ModelInterface):
         ana = analyzer(self.model)
 
         # compute relevance
-        r_batch_dict = ana.attribute(batch, target=neuron_selection)    # baseline
+        batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+        r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
         # explained_layer_names=layer_names)
+        r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).numpy()}
 
         return r_batch_dict

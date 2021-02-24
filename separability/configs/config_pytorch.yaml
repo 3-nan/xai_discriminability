@@ -51,7 +51,7 @@ classes:
 quantifications:
   - attribution_computation:
       config:
-          memory_per_job: 20G
+          memory_per_job: 40G
 #  - attribution_localization:
 #      config:
 #          memory_per_job: 5G
