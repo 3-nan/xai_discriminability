@@ -21,14 +21,15 @@ class Dataset(ABC):
         one of the options train or val
     samples: list
         list of Datasamples of type DataSample
-    labels: list
-        list of labels assigned to the samples
     mode: str
         mode of the dataset to control which attributes of DataSample need to be prepared
     cmap:   list or dict
         information to determine a classname to index mapping or vice versa
     classes: list
         list of classnames to be used in this dataset object
+    (optional?)
+    labels/anns: list
+        list of labels assigned to the samples
     """
 
     def __init__(self, datapath, partition):

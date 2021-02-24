@@ -28,9 +28,6 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
     dataset = dataset(data_path, "val")
     dataset.set_mode("binary_mask")
 
-    labels = np.array(dataset.labels)
-    print(labels.shape)
-
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     total_scores = []
