@@ -2,6 +2,17 @@ from abc import ABC, abstractmethod
 
 
 class ModelInterface(ABC):
+    """ Abstract Interface of the Model Class
+    -----------
+    Attributes
+    -----------
+    path: str
+        path, where the model is stored
+    name: str
+        name of the model e.g. vgg16
+    type: str
+        backend that the model is build on (tensorflow / pytorch)
+    """
 
     def __init__(self, modelpath, modelname, modeltype):
         """ Initialize the model. """
@@ -17,10 +28,30 @@ class ModelInterface(ABC):
 
     @abstractmethod
     def predict(self, data):
-        """ Compute model predictions for the given data. """
+        """ Compute model predictions for the given data.
+        Parameters:
+            data: numpy array
+                numpy array of data to compute predictions for
+        Returns
+            numpy array of predictions
+        """
         return NotImplementedError
 
     @abstractmethod
     def compute_relevance(self, batch, layer_names, neuron_selection, xai_method, additional_parameter):
-        """ Computes relevance maps for the given data and labels. """
+        """ Computes attributions for the given data and labels.
+        Parameters
+            batch: numpy array
+                numpy array of data to compute attributions for
+            layer_names: list of str
+                list of layer names to compute attributions for
+            neuron_selection: int
+                selected output neuron for attribution
+            xai_method: str
+                xai_method key for method mapping
+            addidional_parameter: int
+                as some xai method can be modified using additional parameters (tbd)
+        Returns
+            numpy array of attributions
+        """
         return NotImplementedError

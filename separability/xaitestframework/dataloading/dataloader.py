@@ -3,7 +3,21 @@ import random
 
 
 class DataLoader:
-    """ manages and provides batches of datasets (train/val)"""
+    """ Encapsulates the dataloading functionality.
+    -----------
+    Attributes
+    -----------
+    dataset: object of type Dataset
+        Dataset object to apply dataloading to
+    batch_size: int
+        size of batches to split the dataset into, default: 32
+    shuffle: bool
+        indicator if the dataset should be shuffled before making batches
+    startidx: int
+        when set, the dataset is loaded from startidx to endidx
+    endidx: int
+        when set, the dataset is loaded from startidx to endidx
+    """
 
     def __init__(self, dataset, batch_size=32, shuffle=False, startidx=0, endidx=0):
         self.dataset = dataset
@@ -20,7 +34,7 @@ class DataLoader:
             self.idx = list(range(len(self.dataset)))
 
     def __iter__(self):
-
+        """ Iterator of the given dataset. """
         if self.shuffle:
             random.shuffle(self.idx)
 
@@ -46,15 +60,3 @@ class DataLoader:
             self.current_batch += 1
 
             return np.array(samples)
-
-            # if self.dataset.mode == "raw":
-            #     return np.array(samples)  # np.array([sample.filename for sample in samples])
-            #
-            # elif self.dataset.mode == "preprocessed":
-            #     return np.array([sample.image for sample in samples]), np.array([sample.one_hot_label for sample in samples])
-            #
-            # elif self.dataset.mode == "binarymap":
-            #     return np.array(samples)
-            #
-            # else:
-            #     return ValueError("dataset mode not valid")

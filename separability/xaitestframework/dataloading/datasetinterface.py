@@ -42,7 +42,7 @@ class Dataset(ABC):
         super().__init__()
 
     def __len__(self):
-        """ Returns the length of the dataset. """
+        """ Returns the length of the dataset as int. """
         return len(self.samples)
 
     @abstractmethod
