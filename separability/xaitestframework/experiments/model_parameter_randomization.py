@@ -123,6 +123,9 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
 
                     # compute distance value and append
                     score = distance_function(explanation, original_explanation)
+                    # confirm that the distance score is non-negative
+                    score = np.abs(score)
+                    # append
                     diff[distance].append(score)
 
         # compute results and save to dict

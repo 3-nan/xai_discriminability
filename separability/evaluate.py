@@ -18,8 +18,8 @@ def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
     execthis = ['#!/bin/bash']
     execthis = ['source /home/fe/motzkus/.bashrc']  # enables conda for bash ToDo: change dir
     # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
-    execthis += ['{} activate {}'.format(configs['system_config']['conda'], configs['system_config']['environment'])]  # enter venv
-    execthis += ['python3 -m xaitestframework.experiments.{} {}'.format(quantification_method, args)]  # call script with parameters.
+    execthis += ['{} activate {}'.format(configs['system_config']['conda'], configs['system_config']['environment'])]
+    execthis += ['python3 -m xaitestframework.experiments.{} {}'.format(quantification_method, args)]
     execthis += ['{} deactivate'.format(configs['system_config']['conda'])]  # leave venv
     execthis = '\n'.join(execthis)
 
@@ -163,12 +163,21 @@ def evaluate(filepath):
                         for i in range(math.ceil(len(dataset) / job_size)):
                             job_args = args + " -si " + str(i * job_size) + " -ei " + str((i + 1) * job_size)
 
-                            submit_on_sungrid(job_args, configs, quantifications[0]["attribution_computation"]["config"],
-                                              "attribution_computation", job_index)       # ToDo
+                            submit_on_sungrid(job_args,
+                                              configs,
+                                              quantifications[0]["attribution_computation"]["config"],
+                                              "attribution_computation",
+                                              job_index)       # ToDo
                             job_index += 1
 
                     elif backend == "ubuntu":
-                        submit_on_ubuntu(configs['data'], configs['model'], configs['layers'], xai_method, label_idx, job_index, explanationdir)
+                        submit_on_ubuntu(configs['data'],
+                                         configs['model'],
+                                         configs['layers'],
+                                         xai_method,
+                                         label_idx,
+                                         job_index,
+                                         explanationdir)
                         job_index += 1
 
         else:

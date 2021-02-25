@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # from ..xaitestframework.helpers.universal_helper import join_path
 
 
-filepath = "config_separability.yaml"
+filepath = "configs/config_separability.yaml"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)

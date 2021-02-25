@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 # from ..xaitestframework.helpers.universal_helper import join_path
 
 
-filepath = "eval.yaml"
+filepath = "configs/eval.yaml"
+
+option = "cascading_bottom_up"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    resultdir = "../results/model_parameter_randomization/cascading_top_down"
+    resultdir = "../results/model_parameter_randomization/{}".format(option)
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 
@@ -75,14 +77,15 @@ with open(filepath) as file:
 
                 csv = pd.read_csv(resultdir + "_" + xai_method + "_" + str(classidx) + ".csv")
 
-                layer_scores.append(np.array(csv[measure], dtype=float))   # .as_type(np.float))
+                layer_scores.append(np.abs(np.array(csv[measure], dtype=float)))   # .as_type(np.float))
 
             mean_scores = np.mean(layer_scores, axis=0)
 
             plt.plot(csv["layer"], mean_scores)
 
+        plt.xticks(rotation="45", ha="right")
         plt.legend(configs["xai_methods"])
-        plt.title("MPR with distance measure {}".format(measure))
-        plt.show()
-
-
+        plt.title("MPR with distance measure {} for option {}".format(measure, option))
+        # plt.show()
+        plt.savefig("../results/mpr_{}_{}".format(measure, option), format="png")
+        plt.close()
