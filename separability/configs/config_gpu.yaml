@@ -1,7 +1,7 @@
 # config.yaml file
 
 system_config:
-  backend: sge # ubuntu
+  backend: ubuntu # ubuntu
   conda: conda
   environment: separability
   threads: 5
@@ -11,7 +11,7 @@ data:
   dataname: voc2012
   datasetobject: VOC2012Dataset
   partition: val  # might delete to enable simultaneous computation on train/val dataset
-  batchsize: 50
+  batchsize: 2
 
 model:
   modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
@@ -19,20 +19,13 @@ model:
   modeltype: pytorch
 
 dirs:
-  logdir: logs-zennit/
-  scriptdir: scripts-zennit/
+  logdir: logs-gpu/
+  scriptdir: scripts-gpu/
   explanationdir: /data/cluster/users/motzkus/relevance_maps
   outputdir: /data/cluster/users/motzkus/results
 
 layers:
-  - conv1
-  - conv3
-  - conv5
-  - conv8
-  - conv11
-  - linear1
-  - linear2
-  - linear3
+  - input_1
 #  - block1_conv1
 #  - block2_conv1
 #  - block3_conv1
@@ -49,15 +42,7 @@ xai_methods:
 #  - LRPGamma
 #  - Gradient
 #  #- SmoothGrad
-#  - IntegratedGradients
-#  - Saliency
-#  - Deconvolution
-  - epsilon
-#  - epsilon_gamma_box
-#  - epsilon_plus
-#  - epsilon_plus_flat
-#  - epsilon_alpha2_beta1
-#  - alpha2_beta1
+  - IntegratedGradients
 
 classes:
   - all
@@ -66,7 +51,7 @@ classes:
 quantifications:
   - attribution_computation:
       config:
-          memory_per_job: 5G
+          memory_per_job: 40G
 #  - attribution_localization:
 #      config:
 #          memory_per_job: 5G

@@ -69,7 +69,7 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
     # iterate data
     for batch in dataloader:
 
-        data = [sample.datum for sample in batch]
+        # data = [sample.datum for sample in batch]
 
         if rule != "random":
             # get/sort indices for pixelflipping order
@@ -87,7 +87,8 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
             indices = np.array(indices)
 
         else:
-            indices = [np.argsort(np.max(sample, axis=2), axis=None) for sample in data]
+            # random
+            indices = [np.argsort(np.max(sample.datum, axis=2), axis=None) for sample in batch]
             indices = np.array(indices)
             np.random.shuffle(indices)
 
@@ -96,41 +97,56 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
         # loop flip_percentages
         for percentage in percentage_values:
 
-            # get first percentage part of pixel indices (lowest relevance)
-            # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
-            # get last percentage part of pixel indices (highest relevance)
-            indicesfraction = indices[:, int((1 - percentage) * indices.shape[1]):]
-            print(indicesfraction.shape)
+            if percentage == 0:
+                flipped_data = np.array([sample.datum for sample in batch])
 
-            flipped_data = []
+            else:
 
-            # flip images
-            for p, point in enumerate(data):
-                # flip pixels
-                if distribution == "inpaint_telea" or distribution == "inpaint_ns":
-                    # build mask
-                    mask = np.zeros(point.shape)
-                    np.put(mask, indicesfraction[p], 1)
+                # get first percentage part of pixel indices (lowest relevance)
+                # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
+                # get last percentage part of pixel indices (highest relevance)
+                indicesfraction = indices[:, int((1 - percentage) * indices.shape[1]):]
+                print(indicesfraction.shape)
 
-                    if distribution == "inpaint_telea":
-                        point = cv2.inpaint(point, mask, 3, cv2.INPAINT_TELEA)
-                    elif distribution == "inpaint_ns":
-                        point = cv2.inpaint(point, mask, 3, cv2.INPAINT_NS)
-                    else:
-                        raise ValueError("Error in name of distribution to do inpainting.")
-                else:
-                    for axis in range(point.shape[2]):
-                        if distribution == "uniform":
-                            random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
-                        elif distribution == "gaussian":
-                            random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
+                flipped_data = []
+
+                # flip images
+                for p, sample in enumerate(batch):
+                    # flip pixels
+                    if distribution == "inpaint_telea" or distribution == "inpaint_ns":
+                        # build mask
+                        mask = np.zeros(sample.datum.shape[:2], dtype=np.uint8)[:, :, np.newaxis]
+                        print(np.shape(mask))
+                        np.put(mask, indicesfraction[p], 1.0)
+
+                        # get filepath
+                        filepath = "not implemented"    # ToDo: how to get filepath/image file as expected?
+                        img = cv2.imread(filepath, cv2.IMREAD_COLOR)
+
+                        if distribution == "inpaint_telea":
+                            # sample.filename
+                            datum = cv2.inpaint(img, mask, 3, cv2.INPAINT_TELEA)
+                        elif distribution == "inpaint_ns":
+                            datum = cv2.inpaint(img, mask, 3, cv2.INPAINT_NS)
                         else:
-                            raise ValueError("No distribution for flipping pixels specified.")
-                        np.put_along_axis(point[:, :, axis], indicesfraction[p], random_values, axis=None)
+                            raise ValueError("Error in name of distribution to do inpainting. not implemented")
 
-                flipped_data.append(point)
+                        # preprocess datum
+                        datum = dataloader.dataset.preprocess_image(datum)      # ToDo: preprocess image not correctly defined
+                    else:
+                        datum = sample.datum
+                        for axis in range(datum.shape[2]):
+                            if distribution == "uniform":
+                                random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
+                            elif distribution == "gaussian":
+                                random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
+                            else:
+                                raise ValueError("No distribution for flipping pixels specified.")
+                            np.put_along_axis(datum[:, :, axis], indicesfraction[p], random_values, axis=None)
 
-            flipped_data = np.array(flipped_data)
+                    flipped_data.append(datum)
+
+                flipped_data = np.array(flipped_data)
 
             # compute score on flipped data
             # predictions = model.predict(flipped_data, batch_size=len(flipped_data))

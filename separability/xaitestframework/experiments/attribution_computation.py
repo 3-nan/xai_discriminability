@@ -21,7 +21,10 @@ def combine_path(output_dir, attributes):
     for attr in attributes:
 
         if not os.path.exists(output_dir + "/" + attr):
-            os.makedirs(output_dir + "/" + attr)
+            try:
+                os.makedirs(output_dir + "/" + attr)
+            except FileExistsError:
+                pass
         output_dir = output_dir + "/" + attr
 
     return output_dir
@@ -29,6 +32,9 @@ def combine_path(output_dir, attributes):
 
 def compute_attribution_wrapper(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, model_type, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Wrapper Function to compute the attributed relevances for the selected class. """
+
+    print("start relevance map computation now")
+    start = time.process_time()
 
     print("compute explanations for layer(s): {}".format(layer_names))
 
@@ -44,6 +50,10 @@ def compute_attribution_wrapper(data_path, data_name, dataset_name, partition, b
 
     compute_attributions_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=startidx, endidx=endidx)
+
+    print("Duration of relevance map computation:")
+    print(time.process_time() - start)
+    print("Job executed successfully.")
 
 
 def compute_attributions_for_class(dataset, partition, batch_size, model, layer_names,

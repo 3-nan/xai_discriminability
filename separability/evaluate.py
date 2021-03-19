@@ -16,7 +16,8 @@ def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
 
     # generate script
     execthis = ['#!/bin/bash']
-    execthis = ['source /home/fe/motzkus/.bashrc']  # enables conda for bash ToDo: change dir
+    execthis = ['hostname']
+    execthis += ['source /home/fe/motzkus/.bashrc']  # enables conda for bash ToDo: change dir
     # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
     execthis += ['{} activate {}'.format(configs['system_config']['conda'], configs['system_config']['environment'])]
     execthis += ['python3 -m xaitestframework.experiments.{} {}'.format(quantification_method, args)]
@@ -197,7 +198,7 @@ def evaluate(filepath):
                 for xai_method in xai_methods:
                     method_args = method_args + " -r " + xai_method
 
-                    if quantification in ["attribution_localization", "model_parameter_randomization", "pixelflipping"]:
+                    if quantification in ["model_parameter_randomization", "pixelflipping"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)

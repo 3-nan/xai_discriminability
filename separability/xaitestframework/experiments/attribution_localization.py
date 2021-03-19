@@ -23,6 +23,12 @@ def get_explanation(relevance_path, data_name, model_name, layer, xai_method, fi
 def attribution_localization(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_names, xai_method, output_dir):
     """ Computes the attribution localization score. """
 
+    # get input layer
+    if isinstance(layer_names, list):
+        input_layer = layer_names[0]
+    else:
+        input_layer = layer_names
+
     # initialize dataset and dataloader
     dataset = get_dataset(dataset_name)
     dataset = dataset(data_path, "val")
@@ -39,7 +45,7 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
             sample_weighted_score = 0.0
             for label in sample.label:
                 # get attribution according to label
-                explanation = get_explanation(relevance_path, data_name, model_name, "input_1", xai_method, sample.filename, dataset.classname_to_idx(label))
+                explanation = get_explanation(relevance_path, data_name, model_name, input_layer, xai_method, sample.filename, dataset.classname_to_idx(label))
                 binary_mask = sample.binary_mask[label]
 
                 # check on any positive value in explanation
@@ -99,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir", type=str, default="./output", help="Sets the output directory for the results")
     parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
     parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-mt", "--model_type", type=str, default=None, help="AI Framework to use (tensorflow, pytorch")
     parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
     parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")

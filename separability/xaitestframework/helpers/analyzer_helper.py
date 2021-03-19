@@ -10,8 +10,8 @@ INNVESTIGATE_DICT = {
     "LRPGamma": innvestigate.analyzer.LRPGamma,
     "LRPAlpha1Beta0": innvestigate.analyzer.LRPAlpha1Beta0,
     "LRPAlpha2Beta1": innvestigate.analyzer.LRPAlpha2Beta1,
-    "LRPSequentialPresetA": innvestigate.analyzer.LRPSequentialPresetA,
-    "LRPSequentialPresetB": innvestigate.analyzer.LRPSequentialPresetB,
+    "LRPSequentialCompositeA": innvestigate.analyzer.LRPSequentialCompositeA,
+    "LRPSequentialCompositeB": innvestigate.analyzer.LRPSequentialCompositeB,
     "LRPSequentialCompositeBFlat": innvestigate.analyzer.LRPSequentialCompositeBFlat
 }
 

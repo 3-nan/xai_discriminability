@@ -249,7 +249,7 @@ class VOC2012Dataset(Dataset):
                     if object['name'] in binary_mask.keys():
                         mask = binary_mask[object['name']]
                     else:
-                        mask = np.zeros((width, height), dtype=int)
+                        mask = np.zeros((width, height), dtype=np.uint8)
 
                     mask[int(object['bndbox']['xmin']):int(object['bndbox']['xmax']), int(object['bndbox']['ymin']):int(object['bndbox']['ymax'])] = 1
 
@@ -258,7 +258,7 @@ class VOC2012Dataset(Dataset):
         # preprocess binary masks to fit shape of image data
         for key in binary_mask.keys():
             # binary_mask[key] = tf.image.resize(binary_mask[key][:, :, np.newaxis], [224, 224]).numpy().astype(int)
-            binary_mask[key] = cv2.resize(binary_mask[key][:, :, np.newaxis], [224, 224], interpolation=cv2.INTER_CUBIC).astype(np.int)
+            binary_mask[key] = cv2.resize(binary_mask[key], (224, 224), interpolation=cv2.INTER_NEAREST).astype(np.int)[:, :, np.newaxis]
 
         return binary_mask
 

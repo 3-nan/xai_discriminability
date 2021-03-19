@@ -36,13 +36,13 @@ layers:
 
 xai_methods:
   - LRPZ
-  - LRPAlpha1Beta0
-  - LRPSequentialCompositeA
-  - LRPSequentialCompositeBFlat
-  - LRPGamma
-  - Gradient
-  - SmoothGrad
-  - random
+#  - LRPAlpha1Beta0
+#  - LRPSequentialCompositeA
+#  - LRPSequentialCompositeBFlat
+#  - LRPGamma
+#  - Gradient
+#  - SmoothGrad
+#  - random
 
 classes:
   - all
@@ -61,7 +61,7 @@ quantifications:
             - 0.3
             - 0.4
             - 0.5
-          distribution: gaussian   # uniform, gaussian
+          distribution: inpaint_telea   # uniform, gaussian, inpaint_telea, inpaint_ns
       config:
           memory_per_job: 5G
 #  - model_parameter_randomization:

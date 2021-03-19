@@ -174,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir", type=str, default="/output", help="Sets the output directory for the results")
     parser.add_argument("-m", "--model_path", type=str, default=None, help="path to the model")
     parser.add_argument("-mn", "--model_name", type=str, default=None, help="Name of the model to be used")
+    parser.add_argument("-mt", "--model_type", type=str, default=None, help="AI Framework to use (tensorflow, pytorch")
     parser.add_argument("-si", "--start_index", type=int, default=0, help="Index of dataset to start with")
     parser.add_argument("-ei", "--end_index", type=int, default=50000, help="Index of dataset to end with")
     parser.add_argument("-p", "--partition", type=str, default="train", help="Either train or test for one of these partitions")

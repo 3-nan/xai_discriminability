@@ -1,7 +1,7 @@
 import os
 
 
-dir = "logs-separability"
+dir = "logs-zennit"
 
 for filename in os.listdir(dir):
 

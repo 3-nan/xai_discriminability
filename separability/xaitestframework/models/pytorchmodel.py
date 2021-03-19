@@ -1,18 +1,29 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from captum.attr import Deconvolution, GradientAttribution, IntegratedGradients, Lime
+from captum.attr import Deconvolution, GradientAttribution, IntegratedGradients, Lime, Saliency
 
-
+from ..explainers.zennit.torchvision import VGGCanonizer
+from ..explainers.zennit.composites import COMPOSITES, LAYER_MAP_BASE, LayerMapComposite
+from ..explainers.zennit.rules import *
+from ..explainers.composites import *
 from .modelinterface import ModelInterface
 
 
+CAPTUM_LAYERWISE = ["IntegratedGradients"]
+
 CAPTUM_DICT = {
+    "Saliency": Saliency,
     "IntegratedGradients": IntegratedGradients,
     "GradientAttribution": GradientAttribution,
     "Deconvolution": Deconvolution,
     "Lime": Lime
 }
+
+# ZENNIT_DICT = {
+#     "epsilon": LayerMapComposite(layer_map=LAYER_MAP_BASE + [(nn.Module, Epsilon())])
+# }
 
 
 def parse_captum_method(xai_method, additional_parameter=None):
@@ -24,6 +35,32 @@ def parse_captum_method(xai_method, additional_parameter=None):
         # analyzer = None
         raise ValueError("Analyzer name {} not correct.".format(xai_method))
     return method
+
+
+def get_zennit_composite(xai_method, model, shape=None):
+    """ Get the composite based on the xai_method. """
+    composite_kwargs = {}
+    if xai_method == 'epsilon_gamma_box':
+
+        # the highest and lowest pixel values for the ZBox rule
+        composite_kwargs['low'] = -1 * torch.ones(*shape, device=model.device)
+        composite_kwargs['high'] = torch.ones(*shape, device=model.device)
+
+    # use torchvision specific canonizers, as supplied in the MODELS dict
+    composite_kwargs['canonizers'] = [VGGCanonizer()]  # [MODELS[model_name][1]()]
+
+    # create a composite specified by a name; the COMPOSITES dict includes all preset composites
+    # provided by zennit.
+    composite = COMPOSITES[xai_method]
+
+    composite = composite(**composite_kwargs)
+
+    return composite
+
+
+def hook(module, input, output):
+    module.output = output
+    output.retain_grad()
 
 
 def get_pytorch_model(modelname):
@@ -51,24 +88,25 @@ class PytorchModel(ModelInterface):
 
         # init
         self.model = get_pytorch_model(modelname)
+        self.model.to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
 
         # build layer name dictionary
         conv_counter = 1
         linear_counter = 1
-        self.layer_names = {}
+        self.layer_dict = {}
         for layer in self.model.modules():
             if type(layer) not in [nn.Module, nn.Sequential]:
                 if type(layer) == nn.Conv2d:
-                    self.layer_names["conv" + str(conv_counter)] = layer
+                    self.layer_dict["conv" + str(conv_counter)] = layer
                     conv_counter += 1
                 elif type(layer) == nn.Linear:
-                    self.layer_names["linear" + str(linear_counter)] = layer
+                    self.layer_dict["linear" + str(linear_counter)] = layer
                     linear_counter += 1
 
         super().__init__(model_path, modelname, "pytorch")
-        print("Model successfulldatay initialized.")
+        print("Model successfully initialized.")
 
     def evaluate(self, data, labels):
         """ Evaluates the model on the given data. """
@@ -79,14 +117,20 @@ class PytorchModel(ModelInterface):
         """ Compute predictions for the given data. """
         data_tensor = torch.as_tensor(data, device=self.device).permute(0, 3, 1, 2)
         outputs = self.model(data_tensor)          # ToDo: implement usage of batch size, implement prediction
-        return outputs.detach().numpy()
+
+        # activation functionality
+        sigmoid = torch.nn.Sigmoid()
+
+        outputs = sigmoid(outputs)
+
+        return outputs.detach().cpu().numpy()
 
     def get_layer_names(self, with_weights_only=False):
         """ Returns the layer names of the model. """
 
         if with_weights_only:
             # layer_names = [layer.name for layer in self.model.layers if hasattr(layer, 'kernel_initializer')]   # ToDo
-            layers = self.layer_names.keys()
+            layers = self.layer_dict.keys()
             # for module in self.model.modules():
             #     if type(module) not in [nn.Module, nn.Sequential]:
             #         if hasattr(module, "weight"):
@@ -104,7 +148,7 @@ class PytorchModel(ModelInterface):
         """ Randomizes the weights of the model in the choosen layer. """
 
         # layer_name.weight.data.fill_(0.01)
-        layer = self.layer_names[layer_name]
+        layer = self.layer_dict[layer_name]
         layer.reset_parameters()
         # alternatively self.model.state_dict()[layer_name]['weight']
         # layer = self.model.get_layer(name=layer_name)
@@ -117,13 +161,72 @@ class PytorchModel(ModelInterface):
     def compute_relevance(self, batch, layer_names, neuron_selection, xai_method, additional_parameter=None):
         """ Compute relevance maps for the provided data batch. """
 
-        analyzer = parse_captum_method(xai_method, additional_parameter=additional_parameter)
-        ana = analyzer(self.model)
+        # convert layer_names to layers
+        layers = [self.layer_dict[layer_name] for layer_name in layer_names]
 
-        # compute relevance
-        batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
-        r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
-        # explained_layer_names=layer_names)
-        r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).numpy()}
+        if xai_method in CAPTUM_DICT.keys():
+            # Captum attribution computation
+            analyzer = parse_captum_method(xai_method, additional_parameter=additional_parameter)
+
+            if xai_method not in CAPTUM_LAYERWISE:
+                ana = analyzer(self.model)
+
+                # compute relevance
+                batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+                r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
+                # explained_layer_names=layer_names)
+                r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()}
+            else:
+                r_batch_dict = {}
+
+                ana = analyzer(self.model, layers)
+
+                # compute relevance
+                batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+
+                r_list = ana.attribute(batch_tensor, target=neuron_selection)
+                for i, layer in enumerate(layer_names):
+                    if len(r_list[i].size()) == 4:
+                        r_batch_dict[layer] = r_list[i].detach().permute(0, 2, 3, 1).cpu().numpy()
+                    else:
+                        r_batch_dict[layer] = r_list[i].detach().cpu().numpy()
+        else:
+            r_batch_dict = {}
+
+            # Zennit attribution computation
+            batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+
+            eye = torch.eye(20, device=self.device)
+            targets = np.ones(len(batch)) * neuron_selection
+
+            composite = get_zennit_composite(xai_method, self, shape=list(batch_tensor.size()))
+
+            with composite.context(self.model) as modified:
+
+                # get handles for chosen layers
+                handles = [layer.register_forward_hook(hook) for layer in layers]
+
+                batch_tensor.requires_grad_()
+                output_relevance = eye[targets]
+
+                out = modified(batch_tensor)
+                torch.autograd.backward((out,), (output_relevance,))
+
+                for handle in handles:
+                    handle.remove()
+
+            for i, name in enumerate(layer_names):
+                r_batch = layers[i].output.grad
+
+                shape = list(r_batch.size())
+
+                if len(shape) == 4:
+                    r_batch_dict[name] = r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()
+                else:
+                    r_batch_dict[name] = r_batch.detach().cpu().numpy()
+
+            # r_batch = batch_tensor.grad
+
+            # r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()}
 
         return r_batch_dict
