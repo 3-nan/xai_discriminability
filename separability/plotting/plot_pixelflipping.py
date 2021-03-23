@@ -2,9 +2,12 @@ import yaml
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # from ..xaitestframework.helpers.universal_helper import join_path
 
+# sns.set_theme(style="darkgrid")
+# sns.set_palette(sns.color_palette("hls", 20))
 
 filepath = "configs/config_experiments.yaml"
 
@@ -72,3 +75,10 @@ with open(filepath) as file:
     plt.legend(configs["xai_methods"])
 
     plt.show()
+
+
+def lineplot(data, xlabel, ylabel):
+
+    plot = sns.lineplot(x=xlabel, y=ylabel, data=data)
+
+    return plot

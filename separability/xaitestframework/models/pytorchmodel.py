@@ -2,7 +2,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from captum.attr import Deconvolution, GradientAttribution, IntegratedGradients, Lime, Saliency
+from captum.attr import (Deconvolution, GradientAttribution, IntegratedGradients, Lime, Saliency,
+                         LayerGradientXActivation,
+                         LayerGradCam,
+                         LayerDeepLift,
+                         LayerIntegratedGradients)
 
 from ..explainers.zennit.torchvision import VGGCanonizer
 from ..explainers.zennit.composites import COMPOSITES, LAYER_MAP_BASE, LayerMapComposite
@@ -11,14 +15,18 @@ from ..explainers.composites import *
 from .modelinterface import ModelInterface
 
 
-CAPTUM_LAYERWISE = ["IntegratedGradients"]
+CAPTUM_LAYERWISE = ["IntegratedGradients", "GradientXActivation", "GradCam", "DeepLift"]
 
 CAPTUM_DICT = {
     "Saliency": Saliency,
-    "IntegratedGradients": IntegratedGradients,
-    "GradientAttribution": GradientAttribution,
+    # "IntegratedGradients": IntegratedGradients,
+    # "GradientAttribution": GradientAttribution,
     "Deconvolution": Deconvolution,
-    "Lime": Lime
+    # "Lime": Lime,
+    "GradientXActivation": LayerGradientXActivation,
+    "GradCam": LayerGradCam,
+    "DeepLift": LayerDeepLift,
+    "IntegratedGradients": LayerIntegratedGradients,
 }
 
 # ZENNIT_DICT = {
@@ -130,7 +138,7 @@ class PytorchModel(ModelInterface):
 
         if with_weights_only:
             # layer_names = [layer.name for layer in self.model.layers if hasattr(layer, 'kernel_initializer')]   # ToDo
-            layers = self.layer_dict.keys()
+            layers = list(self.layer_dict.keys())
             # for module in self.model.modules():
             #     if type(module) not in [nn.Module, nn.Sequential]:
             #         if hasattr(module, "weight"):
@@ -184,7 +192,7 @@ class PytorchModel(ModelInterface):
                 # compute relevance
                 batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
 
-                r_list = ana.attribute(batch_tensor, target=neuron_selection)
+                r_list = ana.attribute(batch_tensor, target=neuron_selection, attribute_to_layer_input=True)
                 for i, layer in enumerate(layer_names):
                     if len(r_list[i].size()) == 4:
                         r_batch_dict[layer] = r_list[i].detach().permute(0, 2, 3, 1).cpu().numpy()

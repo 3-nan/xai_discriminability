@@ -12,6 +12,119 @@ from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import compute_relevance_path, extract_filename
 
 
+#############################
+# pixel flipping variations #
+#############################
+
+def simple_sampling(batch, indicesfraction, flipping_method):
+    flipped_data = []
+
+    # flip images
+    for s, sample in enumerate(batch):
+        # flip pixels
+
+        datum = sample.datum
+        for axis in range(datum.shape[2]):
+            if flipping_method == "uniform":
+                random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[s]))
+            elif flipping_method == "gaussian":
+                random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[s]))
+            else:
+                raise ValueError("No distribution for flipping pixels specified.")
+            np.put_along_axis(datum[:, :, axis], indicesfraction[s], random_values, axis=None)
+
+        flipped_data.append(datum)
+
+    flipped_data = np.array(flipped_data)
+    return flipped_data
+
+
+def region_perturbation(batch, indicesfraction, flipping_method):
+    indices = []
+
+    # flip images
+    for s, sample in enumerate(batch):
+
+        sample_indices = []
+
+        shape = sample.datum.shape
+
+        # add 9x9 region for each pixel
+        for pixel in indicesfraction[s]:
+
+            # add left pixels
+            if pixel % shape[0] != 0:
+                for value in [pixel - shape[0] - 1, pixel - 1, pixel + shape[0] - 1]:
+                    if (value >= 0) and (value < (shape[0] * shape[1])):
+                        sample_indices.append(value)
+
+            # add right pixels
+            if pixel % (shape[0] - 1) != 0:
+                for value in [pixel - shape[0] + 1, pixel + 1, pixel + shape[0] + 1]:
+                    if (value >= 0) and (value < (shape[0] * shape[1])):
+                        sample_indices.append(value)
+
+            # add top and bottom pixels
+            for value in [pixel - shape[0], pixel, pixel + shape[0]]:
+                if (value >= 0) and (value < (shape[0] * shape[1])):
+                    sample_indices.append(value)
+
+            sample_indices = np.unique(np.array(sample_indices))
+
+        indices.append(sample_indices)
+
+    if flipping_method == "uniform_region":
+        flipped_data = simple_sampling(batch, np.array(indices), "uniform")
+    elif flipping_method == "gaussian_region":
+        flipped_data = simple_sampling(batch, np.array(indices), "gaussian")
+    else:
+        raise ValueError("Region Perturbation method {} not known.".format(flipping_method))
+
+    return flipped_data
+
+
+def inpainting(batch, indicesfraction, flipping_method):
+    flipped_data = []
+
+    for s, sample in enumerate(batch):
+        # build mask
+        mask = np.zeros(sample.datum.shape[:2], dtype=np.uint8)
+        print(np.shape(mask))
+        np.put_along_axis(mask, indicesfraction[s], 1.0, axis=None)
+
+        # get filepath
+        # filepath = "not implemented"  # ToDo: how to get filepath/image file as expected?
+        # img = cv2.imread(filepath, cv2.IMREAD_COLOR)
+
+        datum = sample.datum
+
+        datum = datum.astype(np.float32)
+
+        if flipping_method == "inpaint_telea":
+            # sample.filename
+            for channel in range(datum.shape[2]):
+                datum[:, :, channel] = cv2.inpaint(datum[:, :, channel], mask, 3, cv2.INPAINT_TELEA)
+        elif flipping_method == "inpaint_ns":
+            for channel in range(datum.shape[2]):
+                datum[:, :, :channel] = cv2.inpaint(datum[:, :, channel], mask, 3, cv2.INPAINT_NS)
+        else:
+            raise ValueError("Error in name of distribution to do inpainting. not implemented")
+
+        flipped_data.append(datum)
+
+    return flipped_data
+
+
+FLIPPING_METHODS = {
+    "uniform":  simple_sampling,
+    "gaussian": simple_sampling,
+    "uniform_region": region_perturbation,
+    "gaussian_region": region_perturbation,
+    "inpaint_telea": inpainting,
+    "inpaint_ns": inpainting,
+}
+
+
 def load_explanations(explanationdir, samples, classidx):
     """ Load explanations for the given classidx. """
 
@@ -77,8 +190,6 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
             # reduce explanations dimension
             explanations = np.max(explanations, axis=3)         # ToDo make compliant according to method
 
-            print(explanations.shape)
-
             if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
                 indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
             else:
@@ -106,47 +217,10 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, classidx, rul
                 # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
                 # get last percentage part of pixel indices (highest relevance)
                 indicesfraction = indices[:, int((1 - percentage) * indices.shape[1]):]
-                print(indicesfraction.shape)
 
-                flipped_data = []
+                flipping_method = FLIPPING_METHODS[distribution]
 
-                # flip images
-                for p, sample in enumerate(batch):
-                    # flip pixels
-                    if distribution == "inpaint_telea" or distribution == "inpaint_ns":
-                        # build mask
-                        mask = np.zeros(sample.datum.shape[:2], dtype=np.uint8)[:, :, np.newaxis]
-                        print(np.shape(mask))
-                        np.put(mask, indicesfraction[p], 1.0)
-
-                        # get filepath
-                        filepath = "not implemented"    # ToDo: how to get filepath/image file as expected?
-                        img = cv2.imread(filepath, cv2.IMREAD_COLOR)
-
-                        if distribution == "inpaint_telea":
-                            # sample.filename
-                            datum = cv2.inpaint(img, mask, 3, cv2.INPAINT_TELEA)
-                        elif distribution == "inpaint_ns":
-                            datum = cv2.inpaint(img, mask, 3, cv2.INPAINT_NS)
-                        else:
-                            raise ValueError("Error in name of distribution to do inpainting. not implemented")
-
-                        # preprocess datum
-                        datum = dataloader.dataset.preprocess_image(datum)      # ToDo: preprocess image not correctly defined
-                    else:
-                        datum = sample.datum
-                        for axis in range(datum.shape[2]):
-                            if distribution == "uniform":
-                                random_values = np.random.uniform(-1.0, 1.0, len(indicesfraction[p]))
-                            elif distribution == "gaussian":
-                                random_values = np.random.normal(loc=0.0, scale=1.0, size=len(indicesfraction[p]))
-                            else:
-                                raise ValueError("No distribution for flipping pixels specified.")
-                            np.put_along_axis(datum[:, :, axis], indicesfraction[p], random_values, axis=None)
-
-                    flipped_data.append(datum)
-
-                flipped_data = np.array(flipped_data)
+                flipped_data = flipping_method(batch, indicesfraction, distribution)
 
             # compute score on flipped data
             # predictions = model.predict(flipped_data, batch_size=len(flipped_data))
