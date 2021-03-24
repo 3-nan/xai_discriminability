@@ -52,24 +52,29 @@ def region_perturbation(batch, indicesfraction, flipping_method):
         # add 9x9 region for each pixel
         for pixel in indicesfraction[s]:
 
+            mod = pixel % shape[0]
+
             # add left pixels
-            if pixel % shape[0] != 0:
-                for value in [pixel - shape[0] - 1, pixel - 1, pixel + shape[0] - 1]:
-                    if (value >= 0) and (value < (shape[0] * shape[1])):
-                        sample_indices.append(value)
+            if mod != 0:
+                # print(type(sample_indices))
+                # print(sample_indices)
+                # print(type(pixel))
+                # print(pixel)
+                sample_indices += [pixel - shape[0] - 1, pixel - 1, pixel + shape[0] - 1]
 
             # add right pixels
-            if pixel % (shape[0] - 1) != 0:
-                for value in [pixel - shape[0] + 1, pixel + 1, pixel + shape[0] + 1]:
-                    if (value >= 0) and (value < (shape[0] * shape[1])):
-                        sample_indices.append(value)
+            if mod != shape[0] - 1:
+                sample_indices += [pixel - shape[0] + 1, pixel + 1, pixel + shape[0] + 1]
 
             # add top and bottom pixels
-            for value in [pixel - shape[0], pixel, pixel + shape[0]]:
-                if (value >= 0) and (value < (shape[0] * shape[1])):
-                    sample_indices.append(value)
+            sample_indices += [pixel - shape[0], pixel, pixel + shape[0]]
 
-            sample_indices = np.unique(np.array(sample_indices))
+        # remove out of range values
+        sample_indices = np.array(sample_indices)
+        sample_indices = sample_indices[(sample_indices >= 0) & (sample_indices < shape[0] * shape[1])]
+
+        # remove duplicates
+        sample_indices = np.unique(sample_indices)
 
         indices.append(sample_indices)
 
@@ -106,7 +111,7 @@ def inpainting(batch, indicesfraction, flipping_method):
                 datum[:, :, channel] = cv2.inpaint(datum[:, :, channel], mask, 3, cv2.INPAINT_TELEA)
         elif flipping_method == "inpaint_ns":
             for channel in range(datum.shape[2]):
-                datum[:, :, :channel] = cv2.inpaint(datum[:, :, channel], mask, 3, cv2.INPAINT_NS)
+                datum[:, :, channel] = cv2.inpaint(datum[:, :, channel], mask, 3, cv2.INPAINT_NS)
         else:
             raise ValueError("Error in name of distribution to do inpainting. not implemented")
 

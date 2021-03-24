@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision.models import vgg16
+from torchvision.models import vgg16, resnet18
 from torchnet.meter import mAPMeter
 # from pytorch_lightning.metrics.classification import AveragePrecision
 from sklearn.metrics import average_precision_score
@@ -112,14 +112,29 @@ feature_extract = True
 
 datapath = "../data/VOC2012/"
 
+modelname = "resnet18"
+# model = "vgg16"
+
 # set up model
-model = vgg16(pretrained=True)
+if modelname == "vgg16":
+
+    model = vgg16(pretrained=True)
+    set_parameter_requires_grad(model, feature_extract)
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+elif modelname == "resnet18":
+    model = resnet18(pretrained=True)
+else:
+    raise ValueError("model not known.")
+
 print(model)
 
-set_parameter_requires_grad(model, feature_extract)
-for param in model.classifier.parameters():
-    param.requires_grad = True
-model.classifier[6] = nn.Linear(4096, num_classes)
+if modelname == "vgg16":
+    model.classifier[6] = nn.Linear(4096, num_classes)
+elif modelname == "resnet18":
+    model.fc = nn.Linear(512, num_classes)
+
 
 # load data
 datasetclass = get_dataset("VOC2012Dataset")

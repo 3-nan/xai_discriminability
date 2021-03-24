@@ -71,6 +71,7 @@ with open(filepath) as file:
 
     plt.xlabel("percentage of flipped pixels")
     plt.ylabel("score")
+    plt.xscale("log")
     plt.title("Pixelflipping (class-wise mean) with {} sampling".format(distribution))
     plt.legend(configs["xai_methods"])
 
