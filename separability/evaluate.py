@@ -196,14 +196,14 @@ def evaluate(filepath):
 
                 job_index = 0
                 for xai_method in xai_methods:
-                    method_args = method_args + " -r " + xai_method
+                    xai_args = method_args + " -r " + xai_method
 
                     if quantification in ["model_parameter_randomization", "pixelflipping"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)
 
-                            job_args = method_args + " -l " + layers[0]
+                            job_args = xai_args + " -l " + layers[0]
                             job_args = job_args + " -cl " + str(idx)
 
                             if quantification == "pixelflipping":
@@ -227,7 +227,7 @@ def evaluate(filepath):
 
                     else:
                         for layer in layers:
-                            job_args = method_args + " -l " + layer
+                            job_args = xai_args + " -l " + layer
 
                             if backend == "sge":
                                 submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],

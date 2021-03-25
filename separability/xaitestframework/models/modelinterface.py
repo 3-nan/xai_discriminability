@@ -21,19 +21,37 @@ class ModelInterface(ABC):
         self.type = modeltype
         super().__init__()
 
-    @abstractmethod
-    def evaluate(self, data, labels):
-        """ Evaluate the performance of the model on the given data. """
-        return NotImplementedError
+    # @abstractmethod
+    # def evaluate(self, data, labels):
+    #     """ Evaluate the performance of the model on the given data. """
+    #     return NotImplementedError
 
     @abstractmethod
     def predict(self, data):
-        """ Compute model predictions for the given data.
+        """ Compute model predictions for the given data (model output).
         Parameters:
             data: numpy array
                 numpy array of data to compute predictions for
         Returns
-            numpy array of predictions
+            numpy array of predictions of shape len(data) * num_classes
+        """
+        return NotImplementedError
+
+    @abstractmethod
+    def get_layer_names(self, with_weights_only=False):
+        """ Get a list of model layer names.
+         Parameters:
+             with_weights_only: boolean
+                whether to include only layers containing weights
+        """
+        return NotImplementedError
+
+    @abstractmethod
+    def randomize_layer_weights(self, layer_name):
+        """ Randomizes the weights of the chosen layer.
+        Parameters:
+            layer_name: str
+                name/key to the chosen layer
         """
         return NotImplementedError
 

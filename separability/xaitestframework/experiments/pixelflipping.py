@@ -94,7 +94,6 @@ def inpainting(batch, indicesfraction, flipping_method):
     for s, sample in enumerate(batch):
         # build mask
         mask = np.zeros(sample.datum.shape[:2], dtype=np.uint8)
-        print(np.shape(mask))
         np.put_along_axis(mask, indicesfraction[s], 1.0, axis=None)
 
         # get filepath
