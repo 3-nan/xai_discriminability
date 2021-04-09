@@ -14,36 +14,38 @@ filepath = "configs/config_experiments.yaml"
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    distribution = "uniform"
+    distribution = "inpaint_ns"
     resultdir = "../results/pixelflipping"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 
+    log_scale = False
+
     layers = [configs["layers"][0]]
     classindices = range(20)
 
-    for xai_method in configs["xai_methods"]:
-
-        plt.figure()
-        print(xai_method)
-        scores = []
-        for classidx in classindices:
-            try:
-                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
-            except FileNotFoundError:
-                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
-            # print(float(csv["separability_score"]))
-            # print(csv)
-            percentages = csv["flip_percentage"]
-            scores = csv["flipped_score"]
-
-            plt.plot(percentages, scores)
-
-        plt.xlabel("percentage of flipped pixels")
-        plt.ylabel("score")
-        plt.title(xai_method + " with {} sampling".format(distribution))
-
-        plt.show()
+    # for xai_method in configs["xai_methods"]:
+    #
+    #     plt.figure()
+    #     print(xai_method)
+    #     scores = []
+    #     for classidx in classindices:
+    #         try:
+    #             csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
+    #         except FileNotFoundError:
+    #             csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
+    #         # print(float(csv["separability_score"]))
+    #         # print(csv)
+    #         percentages = csv["flip_percentage"]
+    #         scores = csv["flipped_score"]
+    #
+    #         plt.plot(percentages, scores)
+    #
+    #     plt.xlabel("percentage of flipped pixels")
+    #     plt.ylabel("score")
+    #     plt.title(xai_method + " with {} sampling".format(distribution))
+    #
+    #     plt.show()
 
     # build mean over classes
     plt.figure()
@@ -71,11 +73,16 @@ with open(filepath) as file:
 
     plt.xlabel("percentage of flipped pixels")
     plt.ylabel("score")
-    plt.xscale("log")
+
+    if log_scale:
+        plt.xscale("log")
+
     plt.title("Pixelflipping (class-wise mean) with {} sampling".format(distribution))
     plt.legend(configs["xai_methods"])
 
-    plt.show()
+    # plt.show()
+
+    plt.savefig("../results/figures/pixelflipping_{}".format(distribution), format="svg")
 
 
 def lineplot(data, xlabel, ylabel):

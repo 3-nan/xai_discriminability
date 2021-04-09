@@ -1,7 +1,7 @@
 import os
 
 
-dir = "logs-zennit"
+dir = "logs-pytorch"
 
 for filename in os.listdir(dir):
 

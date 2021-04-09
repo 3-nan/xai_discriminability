@@ -33,6 +33,8 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
         input_layer = layer_names
 
     scores = {}
+    scores_u50 = {}
+    scores_u25 = {}
 
     # initialize dataset
     datasetclass = get_dataset(dataset_name)
@@ -46,6 +48,8 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
 
         # initialize class score
         class_score = 0
+        class_score_u50 = []
+        class_score_u25 = []
 
         # initialize class dataset
         class_data = datasetclass(data_path, "val", classidx=[classidx])
@@ -65,28 +69,38 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
 
                 binary_mask = sample.binary_mask[label]
 
+                ratio = np.sum(binary_mask) / float(binary_mask.shape[0] * binary_mask.shape[1])
+
                 # check if maximum of explanation is on target object class
                 # case max is at more than one pixel
                 if len(maxindex[0]) > 1:
                     is_in = 0
                     for pixel in maxindex:
                         is_in = is_in or binary_mask[pixel[0], pixel[1]]
-                    class_score += is_in
                 # print(binary_mask[maxindex[0], maxindex[1]])
                 else:
-                    class_score += binary_mask[maxindex[0], maxindex[1]]
+                    is_in = binary_mask[maxindex[0], maxindex[1]]
+
+                class_score += is_in
+                if ratio < 0.5:
+                    class_score_u50.append(is_in)
+                    if ratio < 0.25:
+                        class_score_u25.append(is_in)
 
         print(class_score)
         print(len(class_data))
         scores[classidx] = float(class_score) / len(class_data)
+        scores_u50[classidx] = np.mean(class_score_u50) if class_score_u50 else None
+        scores_u25[classidx] = np.mean(class_score_u25) if class_score_u25 else None
 
     # save results
     results = []
     for key in scores:
-        results.append([data_name, model_name, xai_method, str(key), str(scores[key])])
+        results.append([data_name, model_name, xai_method,
+                        str(key), str(scores[key]), str(scores_u50[key]), str(scores_u25[key])])
 
     df = pd.DataFrame(results,
-                      columns=['dataset', 'model', 'method', 'classidx', 'score'])
+                      columns=['dataset', 'model', 'method', 'classidx', 'score', 'score_u50', 'score_u25'])
     df.to_csv(os.path.join(output_dir, "{}_{}_{}.csv".format(data_name, model_name, xai_method)), index=False)
 
 

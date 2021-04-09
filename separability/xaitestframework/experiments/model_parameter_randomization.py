@@ -37,6 +37,10 @@ def spearman_distance(explanation, original_explanation):
     return spearmanr(np.ravel(original_explanation), np.ravel(explanation))[0]
 
 
+def spearman_distance_abs(explanation, original_explanation):
+    return spearmanr(np.ravel(np.abs(original_explanation)), np.ravel(np.abs(explanation)))[0]
+
+
 def hog_distance(explanation, original_explanation):
     if len(original_explanation.shape) == 3:
         hog_original = hog(original_explanation, multichannel=True)
@@ -52,6 +56,7 @@ DISTANCES = {
     "cosine": cosine_distance,
     "ssim": ssim_distance,
     "spearman": spearman_distance,
+    "spearman_abs": spearman_distance_abs,
     "hog": hog_distance
 }
 
@@ -59,7 +64,7 @@ DISTANCES = {
 #################################
 # implement layer randomization #
 #################################
-def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir, output_dir,
+def layer_randomization(model, dataloader, classidx, xai_method, input_layer, explanationdir, output_dir,
                         top_down=True, independent=False, distances=None):
 
     if not distances:
@@ -97,20 +102,23 @@ def layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, e
             data = [sample.datum for sample in batch]
             # labels = [sample.one_hot_label for sample in batch]
 
-            explanations = model.compute_relevance(data, [bottom_layer], neuron_selection=int(classidx),
+            explanations = model.compute_relevance(data, [input_layer], neuron_selection=int(classidx),
                                                    xai_method=xai_method, additional_parameter=None)
 
             # save explanations and compute diff to original explanation
 
-            for i, explanation in enumerate(explanations[bottom_layer]):
+            for i, explanation in enumerate(explanations[input_layer]):
 
                 # np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation) # ToDo: save some explanations for visual inspection
 
                 # compute similarity
                 original_explanation = np.load(os.path.join(explanationdir, "val", str(classidx), extract_filename(batch[i].filename)) + ".npy")
 
+                # check shapes
+                assert(original_explanation.shape == explanation.shape)
+
                 # normalize explanations
-                original_explanation = original_explanation / np.max(original_explanation)
+                original_explanation = original_explanation / np.max(np.abs(original_explanation))
                 explanation = explanation / np.max(np.abs(explanation))
 
                 for distance in distances:
@@ -152,8 +160,14 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
 def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size,
                                   model_path, model_name, model_type,
-                                  bottom_layer, xai_method, explanationdir, output_dir, maxidx=None, distances=None):
+                                  layer_names, xai_method, explanationdir, output_dir, maxidx=None, distances=None):
     """ Function to create explanations on randomized models. """
+
+    # set bottom layer
+    if isinstance(layer_names, list):
+        input_layer = layer_names[0]
+    else:
+        input_layer = layer_names
 
     # set distance measure
     if not distances:
@@ -162,7 +176,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # init model
     model = init_model(model_path, model_name, framework=model_type)
 
-    explanationdir = compute_relevance_path(explanationdir, data_name, model_name, bottom_layer, xai_method)
+    explanationdir = compute_relevance_path(explanationdir, data_name, model_name, input_layer, xai_method)
 
     # configure directories
     if not os.path.exists(os.path.join(output_dir, "cascading_top_down")):
@@ -187,7 +201,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # CASE 1: cascading layer randomization top-down
     print("case 1: cascading layer randomization top-down")
     case_output_dir = os.path.join(output_dir, "cascading_top_down")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
                                         explanationdir, case_output_dir, top_down=True, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
@@ -196,7 +210,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # CASE 2: cascading layer randomization bottom-up
     print("case 2: cascading layer randomization bottom-up")
     case_output_dir = os.path.join(output_dir, "cascading_bottom_up")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer,
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
                                         explanationdir, case_output_dir, top_down=False, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
@@ -205,7 +219,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # CASE 3: independent layer randomization
     print("case 3: independent layer randomization")
     case_output_dir = os.path.join(output_dir, "independent")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, bottom_layer, explanationdir,
+    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer, explanationdir,
                                         case_output_dir, top_down=False, independent=True, distances=distances)
     # save results
     save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
@@ -259,7 +273,7 @@ if __name__ == "__main__":
                                   ARGS.model_path,
                                   ARGS.model_name,
                                   ARGS.model_type,
-                                  ARGS.layer[0],
+                                  ARGS.layer,
                                   ARGS.rule,
                                   ARGS.relevance_datapath,
                                   ARGS.output_dir,

@@ -37,12 +37,20 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     total_scores = []
+    scores_u50 = []
+    scores_u25 = []
     weighted_scores = []
 
     for batch in dataloader:
         for sample in batch:
-            sample_score = 0.0
-            sample_weighted_score = 0.0
+
+            # sample_score = 0.0
+            # sample_weighted_score = 0.0
+            sample_score = []
+            sample_weighted_score = []
+            sample_score_u50 = []
+            sample_score_u25 = []
+
             for label in sample.label:
                 # get attribution according to label
                 explanation = get_explanation(relevance_path, data_name, model_name, input_layer, xai_method, sample.filename, dataset.classname_to_idx(label))
@@ -75,22 +83,42 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
                     if inside_explanation / total_explanation > 1.0:
                         print("inside explanation {} greater than total explanation {}".format(inside_explanation, total_explanation))
                         # raise ValueError("inside explanation {} greater than total explanation {}".format(inside_explanation, total_explanation))
-                    sample_score += (inside_explanation / total_explanation)
-                    sample_weighted_score += ((inside_explanation / total_explanation) * (size_data / size_bbox))
+
+                    # sample_score += (inside_explanation / total_explanation)
+                    # sample_weighted_score += ((inside_explanation / total_explanation) * (size_data / size_bbox))
+                    sample_score.append(inside_explanation / total_explanation)
+                    sample_weighted_score.append((inside_explanation / total_explanation) * (size_data / size_bbox))
+                    if size_bbox / size_data < 0.5:
+                        sample_score_u50.append(inside_explanation / total_explanation)
+                        if size_bbox / size_data < 0.25:
+                            sample_score_u25.append(inside_explanation / total_explanation)
                 else:
                     print(sample.filename, dataset.classname_to_idx(label))
 
-            total_scores.append(sample_score / len(sample.label))
-            weighted_scores.append(sample_weighted_score / len(sample.label))
+            # total_scores.append(sample_score / len(sample.label))
+            # weighted_scores.append(sample_weighted_score / len(sample.label))
+            total_scores += sample_score
+            weighted_scores += sample_weighted_score
 
-    total_score = float(np.sum(total_scores)) / len(total_scores)
-    weighted_score = float(np.sum(weighted_scores) / len(weighted_scores))
+            if sample_score_u50:
+                # scores_u50.append(np.mean(sample_score_u50))
+                scores_u50 += sample_score_u50
+                if sample_score_u25:
+                    # scores_u25.append(np.mean(sample_score_u25))
+                    scores_u25 += sample_score_u25
+
+    total_score = np.mean(total_scores)  # float(np.sum(total_scores)) / len(total_scores)
+    weighted_score = np.mean(weighted_scores)  # float(np.sum(weighted_scores) / len(weighted_scores))
+
+    score_u50 = np.mean(scores_u50)
+    score_u25 = np.mean(scores_u25)
 
     # save results
-    results = [[data_name, model_name, xai_method, str(total_score), str(weighted_score)]]
+    results = [[data_name, model_name, xai_method,
+                str(total_score), str(weighted_score), str(score_u50), str(score_u25)]]
 
     df = pd.DataFrame(results,
-                      columns=['dataset', 'model', 'method', 'total_score', 'weighted score'])
+                      columns=['dataset', 'model', 'method', 'total_score', 'weighted score', 'score_u50', 'score_u25'])
     df.to_csv(os.path.join(output_dir, "{}_{}_{}.csv".format(data_name, model_name, xai_method)), index=False)
 
 

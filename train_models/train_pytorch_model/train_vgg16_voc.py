@@ -164,7 +164,7 @@ else:
             print("\t", name)
 
 # define optimizer and criterion
-optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+optimizer = optim.SGD(params_to_update, lr=0.005, momentum=0.8)
 
 # criterion = nn.CrossEntropyLoss()
 # criterion = nn.HingeEmbeddingLoss()

@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 # from ..xaitestframework.helpers.universal_helper import join_path
 
 
-filepath = "configs/eval.yaml"
+filepath = "configs/config_experiments.yaml"
 
-option = "cascading_bottom_up"
+option = "independent"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
@@ -65,6 +65,8 @@ with open(filepath) as file:
     #     plt.title("MPR mean difference (mse) of explanations for class {}".format(classidx))
     #     plt.show()
 
+    print(configs["quantifications"])
+
     for measure in configs["quantifications"][0]["model_parameter_randomization"]["args"]["distance_measures"]:
 
         plt.figure()
@@ -87,5 +89,5 @@ with open(filepath) as file:
         plt.legend(configs["xai_methods"])
         plt.title("MPR with distance measure {} for option {}".format(measure, option))
         # plt.show()
-        plt.savefig("../results/mpr_{}_{}".format(measure, option), format="png")
+        plt.savefig("../results/figures/mpr_{}_{}".format(measure, option), format="svg")
         plt.close()

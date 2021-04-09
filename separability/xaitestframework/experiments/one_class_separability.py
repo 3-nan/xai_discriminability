@@ -27,8 +27,8 @@ def load_explanations(explanationdir, samples, classidx):
 
     explanations = np.array(explanations)
 
-    if len(explanations.shape) > 3:
-        explanations = np.mean(explanations, axis=3)
+    # if len(explanations.shape) > 3:
+    #     explanations = np.mean(explanations, axis=3)
 
     return explanations
 
@@ -46,7 +46,6 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     labels = []
 
     for batch in dataloader:
-        # filenames = [sample.filename for sample in batch]
 
         # target explanations
         explanations = load_explanations(explanationdir, batch, classidx=classidx)
@@ -77,6 +76,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
     """ Compute the separability score for the provided relevances. """
 
     # layer_name = layer_names[0]     # TODO: iterate layers
+    endidx = 400
 
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
 
@@ -101,7 +101,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         print("number of samples for this class is {}".format(len(class_data)))
 
-        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True)  # , startidx=0, endidx=2000)
+        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, endidx=endidx)  # , startidx=0, endidx=2000)
 
         # load relevance maps from train partition to train clf
         Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
@@ -122,7 +122,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         test_data = datasetclass(data_path, "val", classidx=[classidx])
         test_data.set_mode("raw")
 
-        testloader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
+        testloader = DataLoader(test_data, batch_size=batch_size, shuffle=True, endidx=endidx)
 
         Rc_test, test_labels = load_explanation_data_for_svc(testloader, classidx, class_indices,
                                                              os.path.join(relevance_path, "val"))

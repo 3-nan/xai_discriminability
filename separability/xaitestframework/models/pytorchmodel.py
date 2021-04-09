@@ -67,8 +67,8 @@ def get_zennit_composite(xai_method, model, shape=None):
 
 
 def hook(module, input, output):
-    module.output = output
-    output.retain_grad()
+    module.input = input[0]
+    module.input.retain_grad()
 
 
 def get_pytorch_model(modelname):
@@ -99,6 +99,9 @@ class PytorchModel(ModelInterface):
         self.model.to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
+
+        # HARD CODED
+        self.num_classes = 20
 
         # build layer name dictionary
         conv_counter = 1
@@ -204,7 +207,7 @@ class PytorchModel(ModelInterface):
             # Zennit attribution computation
             batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
 
-            eye = torch.eye(20, device=self.device)
+            eye = torch.eye(self.num_classes, device=self.device)
             targets = np.ones(len(batch)) * neuron_selection
 
             composite = get_zennit_composite(xai_method, self, shape=list(batch_tensor.size()))
@@ -224,7 +227,7 @@ class PytorchModel(ModelInterface):
                     handle.remove()
 
             for i, name in enumerate(layer_names):
-                r_batch = layers[i].output.grad
+                r_batch = layers[i].input.grad
 
                 shape = list(r_batch.size())
 

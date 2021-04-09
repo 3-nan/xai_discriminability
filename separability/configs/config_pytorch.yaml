@@ -19,13 +19,13 @@ model:
   modeltype: pytorch
 
 dirs:
-  logdir: logs-zennit/
-  scriptdir: scripts-zennit/
+  logdir: logs-pytorch/
+  scriptdir: scripts-pytorch/
   explanationdir: /data/cluster/users/motzkus/relevance_maps
   outputdir: /data/cluster/users/motzkus/results
 
 layers:
-  - conv1
+#  - conv1
   - conv3
   - conv5
   - conv8
@@ -33,6 +33,7 @@ layers:
   - linear1
   - linear2
   - linear3
+
 #  - block1_conv1
 #  - block2_conv1
 #  - block3_conv1
@@ -52,12 +53,15 @@ xai_methods:
 #  - IntegratedGradients
 #  - Saliency
 #  - Deconvolution
-  - epsilon
+#  - epsilon
 #  - epsilon_gamma_box
 #  - epsilon_plus
 #  - epsilon_plus_flat
 #  - epsilon_alpha2_beta1
-#  - alpha2_beta1
+  - alpha2_beta1
+#  - GradientXActivation
+#  - GradCam
+#  - DeepLift
 
 classes:
   - all

@@ -273,83 +273,147 @@ class COCOSample(DataSample):
         self.binary_mask = binary_mask
 
 
-# class COCODataset(Dataset):
-#     """ Implements the coco 2017 dataset. """
-#
-#     def __init__(self, datapath, partition, classidx=None):
-#         """ Initialize coco 2017 dataset. """
-#         super().__init__(datapath, partition)
-#
-#         annotation_file = os.path.join(datapath, "annotations", "instances_{}2017.json".format(partition))
-#         annotations = json.loads(annotation_file)
-#
-#         # self.cmap = annotations["categories"]
-#         #
-#         # if not classidx:
-#         #     self.classes = self.cmap
-#         #
-#         # else:
-#         #     self.classes = []
-#         #     for idx in classidx:
-#         #         self.classes.append(self.cmap[int(idx)])
-#
-#         self.anns, self.cats, self.imgs = {}, {}, {}
-#         self.imgToAnns, catToImgs = collections.defaultdict(list), collections.defaultdict(list)
-#
-#         for ann in annotations["annotations"]:
-#             self.imgToAnns[ann["image_id"]].append(ann)
-#             self.anns[ann["id"]] = ann
-#         for img in annotations["images"]:
-#             self.imgs[img["id"]] = img
-#
-#         for cat in annotations["categories"]:
-#             self.cats[cat["id"]] = cat
-#
-#         for ann in annotations["annotations"]:
-#             catToImgs[ann["category_id"]].append(ann["image_id"])
-#
-#         # for d, datapoint in annotations["images"]:
-#         #     self.samples.append(os.path.join(datapath, "{}2017".format(partition), datapoint["file_name"]))
-#
-#     def __getitem__(self, index):
-#         """ Get the datapoint at index. """
-#
-#         img = self.samples[index]
-#         anns = self.imgToAnns[img["id"]]
-#
-#         if self.mode in ["preprocessed"]:
-#             image = self.preprocess_image(img["file_name"])
-#             # label, one_hot_label = self.preprocess_label(anns)
-#             binary_mask = None
-#         elif self.mode == "binary_mask":
-#             image = None,
-#             # one_hot_label = None,
-#             binary_mask = self.preprocess_binary_mask(filename)
-#         else:
-#             image = None
-#             # one_hot_label = None
-#             binary_mask = None
-#
-#         label, one_hot_label = self.preprocess_label(anns)
-#
-#         sample = VOC2012Sample(
-#             image,
-#             img["file_name"],
-#             label,
-#             one_hot_label,
-#             binary_mask
-#         )
-#
-#     def preprocess_label(self, anns):
-#         """ Reads the annotations and creates label-list and one-hot-encoded label """
-#         label = []
-#         one_hot_label = np.zeros(len(self.cmap))
-#
-#         for ann in anns:
-#             l = self.cats[ann["category_id"]]
-#             if l not in label:
-#                 label.append(l)
-#             # update one hot
-#             one_hot_label[0] = 1             # TODO: category id to index in one hot label
-#
-#         return label, one_hot_label
+class COCODataset(Dataset):
+    """ Implements the coco 2017 dataset. """
+
+    def __init__(self, datapath, partition, classidx=None):
+        """ Initialize coco 2017 dataset. """
+        super().__init__(datapath, partition)
+
+        annotation_file = os.path.join(datapath, "annotations", "instances_{}2017.json".format(partition))
+        annotations = json.loads(annotation_file)
+
+        self.cmap = annotations["categories"]
+
+        if not classidx:
+            self.classes = self.cmap
+
+        else:
+            self.classes = []
+            for idx in classidx:
+                self.classes.append(self.cmap[int(idx)])
+
+        self.anns, self.cats, self.imgs = {}, {}, {}
+        self.imgToAnns, self.catToImgs = collections.defaultdict(list), collections.defaultdict(list)
+
+        for ann in annotations["annotations"]:
+            self.imgToAnns[ann["image_id"]].append(ann)
+            self.anns[ann["id"]] = ann
+
+        for img in annotations["images"]:
+            self.imgs[img["id"]] = img
+
+        for cat in annotations["categories"]:
+            self.cats[cat["id"]] = cat
+
+        for ann in annotations["annotations"]:
+            self.catToImgs[ann["category_id"]].append(ann["image_id"])
+
+        # read samples as image ids
+        self.samples = self.get_img_ids(catIds=classidx)
+
+    def get_img_ids(self, catIds=[]):
+        """ Get img ids for given category ids. """
+        if not catIds:
+            catIds = []
+        catIds = catIds if type(catIds) == list else [catIds]
+
+        if len(catIds) == 0:
+            ids = self.imgs.keys()
+
+        else:
+            ids = set()
+            for i, catId in enumerate(catIds):
+                if i == 0 and len(ids) == 0:
+                    ids = set(self.catToImgs[catId])
+                else:
+                    ids &= set(self.catToImgs[catId])
+
+        return list(ids)
+
+    def __getitem__(self, index):
+        """ Get the datapoint at index. """
+
+        imgId = self.samples[index]
+        img = self.imgs[imgId]
+        anns = self.imgToAnns[img["id"]]
+
+        if self.mode in ["preprocessed"]:
+            image = self.preprocess_image(img["file_name"])
+            # label, one_hot_label = self.preprocess_label(anns)
+            binary_mask = None
+        elif self.mode == "binary_mask":
+            image = None,
+            # one_hot_label = None,
+            binary_mask = self.preprocess_binary_mask(imgId)
+        else:
+            image = None
+            # one_hot_label = None
+            binary_mask = None
+
+        label, one_hot_label = self.preprocess_label(anns)
+
+        sample = VOC2012Sample(
+            image,
+            img["file_name"],
+            label,
+            one_hot_label,
+            binary_mask
+        )
+
+        return sample
+
+    def classname_to_idx(self, class_name):
+        """ convert a classname to an index. """
+        return self.cmap.index(class_name)
+
+    def preprocess_image(self, img):
+        """ Reads and preprocesses the given image. """
+        read_image = cv2.imread(img["file_name"], cv2.IMREAD_COLOR)
+        image_resized = cv2.resize(read_image, (224, 224), interpolation=cv2.INTER_CUBIC)
+        image_normalized = image_resized.astype(np.float32) / 127.5 - 1.0
+
+        return image_normalized
+
+    def preprocess_label(self, anns):
+        """ Reads the annotations and creates label-list and one-hot-encoded label """
+        label = []
+        one_hot_label = np.zeros(len(self.cmap))
+
+        keys = list(self.anns.keys())
+
+        for ann in anns:
+            l = self.cats[ann["category_id"]]
+            if l not in label:
+                label.append(l)
+            # update one hot
+            one_hot_label[keys.index(ann["category_id"])] = 1
+
+        return label, one_hot_label
+
+    def preprocess_binary_mask(self, imgId):
+        """ Get the bounding box as binary mask."""
+
+        anns = self.imgToAnns[imgId]
+        width = self.imgs[imgId]["width"]
+        height = self.imgs[imgId]["height"]
+
+        binary_mask = {}
+
+        for ann in anns:
+            cat = self.cats[ann["category_id"]]
+
+            if cat in binary_mask.keys():
+                mask = binary_mask[cat]
+            else:
+                mask = np.zeros((width, height), dtype=np.uint8)
+
+            bbox = ann["bbox"]
+            mask[bbox[0]:(bbox[0] + bbox[2]), bbox[1]:(bbox[1] + bbox[3])] = 1
+
+            binary_mask[cat] = mask
+
+        for key in binary_mask.keys():
+            binary_mask[key] = cv2.resize(binary_mask[key], (224, 224), interpolation=cv2.INTER_NEAREST).astype(np.int)[:, :, np.newaxis]
+
+        return binary_mask
