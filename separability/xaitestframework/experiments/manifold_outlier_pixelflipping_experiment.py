@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import tracemalloc
 import cv2
+from sklearn.neighbors import NearestNeighbors
+from scipy.spatial.distance import minkowski
 
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
@@ -145,55 +147,84 @@ def load_explanations(explanationdir, samples, classidx):
 def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values):
     """ Wrapper function to load data/model and compute directory paths. """
 
+    n_neighbors = 20
+
     # construct explanationdir
     explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
     explanationdir = os.path.join(explanationdir, partition)
 
     # init model
-    model = init_model(model_path, model_name, framework=model_type)
+    # model = init_model(model_path, model_name, framework=model_type)
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
-    class_data = datasetclass(data_path, partition, classidx=[classidx])
+    class_data = datasetclass(data_path, "train", classidx=[classidx])
     class_data.set_mode("preprocessed")
 
-    dataloader = DataLoader(class_data, batch_size=batch_size)
+    trainloader = DataLoader(class_data, batch_size=batch_size, endidx=300)
 
-    # run pixelflipping computation
-    class_score = compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, classidx, rule, distribution, percentage_values)
+    X = []
+
+    for batch in trainloader:
+        X.append([np.ravel(b.datum) for b in batch])
+
+    X = np.concatenate(X)
+
+    print("Data shape is {}".format(X.shape))
+
+    # train nearest neighbour estimator
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors)
+
+    nbrs.fit(X)
+
+    # load test data
+    test_data = datasetclass(data_path, partition, classidx=[classidx])
+    test_data.set_mode("preprocessed")
+
+    testloader = DataLoader(test_data, batch_size=batch_size)
+
+    # run nearest neighbor computation
+    kappa_scores, gamma_scores, delta_scores = compute_nearest_neighbor_score(testloader, nbrs, X, explanationdir,
+                                                                              classidx, rule, distribution, percentage_values)
 
     # collect results and write to file
     results = []
-    for key in class_score:
-        results.append([data_name, model_name, rule, str(key), str(class_score[key])])
+    for key in kappa_scores:
+        results.append([data_name, model_name, rule,
+                        str(key), str(kappa_scores[key]), str(gamma_scores[key]), str(delta_scores[key])])
 
-    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
+    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'kappa', 'gamma', 'delta'])
     df.to_csv(
         os.path.join(output_dir, "{}_{}_{}_{}_{}.csv".format(data_name, model_name, rule, distribution, str(classidx))),
         index=False)
 
 
-def compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, classidx, rule, distribution, percentage_values):
+def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx, rule, distribution, percentage_values):
     """ Estimate the pixelflipping score. """
 
     print("compute score for classidx {}".format(classidx))
 
-    save_examples = True
+    # save_examples = True
+    #
+    # if save_examples:
+    #     examples_dir = os.path.join(output_dir, "examples", rule, str(classidx), distribution)
+    #     if not os.path.exists(examples_dir):
+    #         os.makedirs(examples_dir)
 
-    if save_examples:
-        examples_dir = os.path.join(output_dir, "examples", rule, str(classidx), distribution)
-        if not os.path.exists(examples_dir):
-            os.makedirs(examples_dir)
+    distance_function = minkowski
 
     # prep result structure
-    class_score = {}
+    kappa_scores = {}
+    gamma_scores = {}
+    delta_scores = {}
+
     for percentage in percentage_values:
-        class_score[percentage] = []
+        kappa_scores[percentage] = []
+        gamma_scores[percentage] = []
+        delta_scores[percentage] = []
 
     # iterate data
     for b, batch in enumerate(dataloader):
-
-        # data = [sample.datum for sample in batch]
 
         if rule != "random":
             # get/sort indices for pixelflipping order
@@ -233,21 +264,44 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, c
 
                 flipped_data = flipping_method(batch, indicesfraction, distribution)
 
-            # compute score on flipped data
-            # predictions = model.predict(flipped_data, batch_size=len(flipped_data))
-            predictions = model.predict(flipped_data, batch_size=len(flipped_data))
+            # compute nearest neighbours
+            nbr_distances, nbr_ind = nbrs.kneighbors([np.ravel(f) for f in flipped_data])
+
+            # compute paper indices: Harmeling et al, 2006, From outliers to prototypes: Ordering data
+            kappas = nbr_distances[:, -1]
+
+            gammas = np.mean(nbr_distances, axis=1)
+
+            deltas = []
+
+            neighbor_points = X[nbr_ind]
+
+            for p, point in enumerate(flipped_data):
+                r_point = np.ravel(point)
+                # compute length of mean of distance vectors to first k neighbours
+                diffs = np.array([r_point - neighbor_point for neighbor_point in neighbor_points[p]])
+                delta_vector = np.mean(np.array([r_point - neighbor_point for neighbor_point in neighbor_points[p]]), axis=0)
+                # print("r_point shape is : {}".format(r_point.shape))
+                # print("nb points shape is: {}".format(np.array(neighbor_points).shape))
+                # print("diffs shape is: {}".format(diffs.shape))
+                # print("delta vector shape is : {}".format(delta_vector.shape))
+                deltas.append(distance_function(r_point, r_point + delta_vector))
 
             # save examples
-            if save_examples and b == 0:
-                for d, datapoint in enumerate(flipped_data[:10]):
-                    np.save(os.path.join(examples_dir, extract_filename(batch[d].filename)) + "_" + str(percentage) + ".npy", datapoint)
+            # if save_examples and b == 0:
+            #     for d, datapoint in enumerate(flipped_data[:10]):
+            #         np.save(os.path.join(examples_dir, extract_filename(batch[d].filename)) + "_" + str(percentage) + ".npy", datapoint)
 
-            class_score[percentage].append(predictions[:, classidx])
+            kappa_scores[percentage].append(kappas)
+            gamma_scores[percentage].append(gammas)
+            delta_scores[percentage].append(np.array(deltas))
 
     for percentage in percentage_values:
-        class_score[percentage] = np.mean(np.concatenate(class_score[percentage]))
+        kappa_scores[percentage] = np.mean(np.concatenate(kappa_scores[percentage]))
+        gamma_scores[percentage] = np.mean(np.concatenate(gamma_scores[percentage]))
+        delta_scores[percentage] = np.mean(np.concatenate(delta_scores[percentage]))
 
-    return class_score
+    return kappa_scores, gamma_scores, delta_scores
 
 
 if __name__ == "__main__":

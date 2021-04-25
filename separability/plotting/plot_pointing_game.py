@@ -11,7 +11,7 @@ filepath = "configs/config_experiments.yaml"
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    resultdir = "../results/pointing_game"
+    resultdir = "../results/pointing_game/with_blur"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 
@@ -66,4 +66,4 @@ with open(filepath) as file:
          }
     df = pd.DataFrame(data=d)
 
-    df.to_csv("../results/pointing_game_results.csv", index=False)
+    df.to_csv("../results/pointing_game_with_blur.csv", index=False)

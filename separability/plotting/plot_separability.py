@@ -11,7 +11,7 @@ filepath = "configs/config_experiments.yaml"
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    resultdir = "../results/one_class_separability"
+    resultdir = "../results/one_class_separability_filters"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 

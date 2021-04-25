@@ -67,14 +67,19 @@ DISTANCES = {
 def layer_randomization(model, dataloader, classidx, xai_method, input_layer, explanationdir, output_dir,
                         top_down=True, independent=False, distances=None):
 
+    save_examples = True
+
     if not distances:
         distances = ["cosine"]
 
     # configure save dir
-    if not os.path.exists(os.path.join(output_dir, "explanations")):
-        os.makedirs(os.path.join(output_dir, "explanations"))
+    # if not os.path.exists(os.path.join(output_dir, "explanations")):
+    #     os.makedirs(os.path.join(output_dir, "explanations"))
+    if save_examples:
+        example_dir = os.path.join(output_dir, "explanations", xai_method, str(classidx))
 
-    # output_dir = join_path(output_dir, "explanations")
+        if not os.path.exists(example_dir):
+            os.makedirs(example_dir)
 
     # get layers including weights and iterate them
     layer_names = model.get_layer_names(with_weights_only=True)
@@ -98,7 +103,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, input_layer, ex
         model = model.randomize_layer_weights(layer_name)
 
         # iterate data and compute explanations
-        for batch in dataloader:
+        for b, batch in enumerate(dataloader):
             data = [sample.datum for sample in batch]
             # labels = [sample.one_hot_label for sample in batch]
 
@@ -116,6 +121,11 @@ def layer_randomization(model, dataloader, classidx, xai_method, input_layer, ex
 
                 # check shapes
                 assert(original_explanation.shape == explanation.shape)
+
+                # save if save_examples == True
+                if b == 0 and save_examples:
+                    np.save(os.path.join(example_dir, extract_filename(batch[i].filename)) + "_original.npy", original_explanation)
+                    np.save(os.path.join(example_dir, extract_filename(batch[i].filename)) + "_" + layer_name + ".npy", explanation)
 
                 # normalize explanations
                 original_explanation = original_explanation / np.max(np.abs(original_explanation))
@@ -194,7 +204,7 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     print(type(class_data))
 
     if maxidx:
-        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, endidx=maxidx)
+        dataloader = DataLoader(class_data, batch_size=batch_size, endidx=maxidx)       # shuffle True?
     else:
         dataloader = DataLoader(class_data, batch_size=batch_size)
 

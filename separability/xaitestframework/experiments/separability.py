@@ -2,7 +2,6 @@ import argparse
 import datetime
 import time
 import os
-import random
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
@@ -13,27 +12,7 @@ from ..dataloading.dataloader import DataLoader
 from ..helpers.universal_helper import extract_filename, compute_relevance_path
 
 
-def load_explanations(explanationdir, samples, classidx):
-    """ Load explanations for the given classidx. """
-
-    explanations = []
-
-    if isinstance(classidx, list):
-        for s, sample in enumerate(samples):
-            explanations.append(np.load(os.path.join(explanationdir, str(classidx[s]), extract_filename(sample.filename)) + ".npy"))
-    else:
-        for s, sample in enumerate(samples):
-            explanations.append(np.load(os.path.join(explanationdir, str(classidx), extract_filename(sample.filename)) + ".npy"))
-
-    explanations = np.array(explanations)
-
-    if len(explanations.shape) > 3:
-        explanations = np.mean(explanations, axis=(1, 2))    # axis = 3
-
-    return explanations
-
-
-def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir):
+def load_explanations_for_sample(filename, classidx, classes, explanationdir):
     """ Load data for the svm classification. """
 
     if classidx in classes:
@@ -42,47 +21,44 @@ def load_explanation_data_for_svc(dataloader, classidx, classes, explanationdir)
     else:
         classindices = classes
 
-    data = []
+    # if len(explanations.shape) > 3:
+    #     explanations = np.mean(explanations, axis=(1, 2))    # axis = 3
+
+    Rs = []
     labels = []
 
-    for batch in dataloader:
+    # target explanation
+    attribution = np.load(os.path.join(explanationdir, str(classidx), extract_filename(filename)) + ".npy")
 
-        # target explanations
-        explanations = load_explanations(explanationdir, batch, classidx=classidx)
+    Rs.append(attribution)
+    labels.append(1)
 
-        data.append(explanations)
-        labels.append(np.ones(len(explanations)))
+    for idx in classindices:
+        # non-target explanations
+        attribution = np.load(os.path.join(explanationdir, str(idx), extract_filename(filename)) + ".npy")
 
-        # repeat
-        for r in range(4):
-            # non-target explanations
-            selected_classes = [random.choice(classindices) for i in range(len(batch))]
-            explanations = load_explanations(explanationdir, batch, classidx=selected_classes)
+        Rs.append(attribution)
+        labels.append(0)
 
-            data.append(explanations)
-            labels.append(np.zeros(len(explanations)))
+    Rs = np.array(Rs)
+    labels = np.array(labels)
 
-    print("shape of the data loaded for testing is")
-    print(np.array(data).shape)
-    data = np.concatenate(data)
-    labels = np.concatenate(labels)
+    # p = np.random.permutation(len(labels))
 
-    p = np.random.permutation(len(labels))
-
-    return data[p], labels[p]
+    return Rs, labels
 
 
 def estimate_separability_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name, layer_name, rule, output_dir):
     """ Compute the separability score for the provided relevances. """
 
     # layer_name = layer_names[0]     # TODO: iterate layers
-    endidx = 400
+    # endidx = 400
 
     relevance_path = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
 
     # initialize dataset
     datasetclass = get_dataset(dataset_name)
-    dataset = datasetclass(data_path, "train")
+    dataset = datasetclass(data_path, partition)
     dataset.set_mode("raw")
 
     print(dataset.classes)
@@ -95,61 +71,54 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         print("estimate one class separability for class " + classidx)
 
+        scores = []
+
         # load dataset for this class
-        class_data = datasetclass(data_path, "train", classidx=[classidx])
+        class_data = datasetclass(data_path, partition, classidx=[classidx])
         class_data.set_mode("raw")
 
         print("number of samples for this class is {}".format(len(class_data)))
 
-        dataloader = DataLoader(class_data, batch_size=batch_size, shuffle=True, endidx=endidx)  # , startidx=0, endidx=2000)
+        dataloader = DataLoader(class_data, batch_size=batch_size)  # , startidx=0, endidx=2000)
 
-        # load relevance maps from train partition to train clf
-        Rc_data, labels = load_explanation_data_for_svc(dataloader, classidx, class_indices,
-                                                        os.path.join(relevance_path, "train"))
+        for batch in dataloader:
 
-        print(Rc_data.shape)
-        print(labels.shape)
+            for sample in batch:
 
-        if len(Rc_data.shape) == 3:
-            Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2]))
-        elif len(Rc_data.shape) == 4:
-            Rc_data = np.reshape(Rc_data, (Rc_data.shape[0], Rc_data.shape[1] * Rc_data.shape[2] * Rc_data.shape[3]))
+                # load explanations for sample
+                Rs, labels = load_explanations_for_sample(sample.filename, classidx, class_indices, os.path.join(relevance_path, partition))
 
-        clf = LinearSVC(class_weight="balanced")
-        clf.fit(Rc_data, labels)
+                if len(Rs.shape) == 3:
+                    Rs = np.reshape(Rs, (Rs.shape[0], Rs.shape[1] * Rs.shape[2]))
+                elif len(Rs.shape) == 4:
+                    Rs = np.reshape(Rs, (Rs.shape[0], Rs.shape[1] * Rs.shape[2] * Rs.shape[3]))
 
-        # load test data
-        test_data = datasetclass(data_path, "val", classidx=[classidx])
-        test_data.set_mode("raw")
+                # clf = LinearSVC(class_weight="balanced")
+                clf = LinearSVC(C=1000, class_weight="balanced")    # very high C (regularization parameter)
+                clf.fit(Rs, labels)
 
-        testloader = DataLoader(test_data, batch_size=batch_size, shuffle=True, endidx=endidx)
+                # TODO: breite des margins der svm messen
 
-        Rc_test, test_labels = load_explanation_data_for_svc(testloader, classidx, class_indices,
-                                                             os.path.join(relevance_path, "val"))
+                margin = 1. / np.sqrt(np.sum(clf.coef_ ** 2))
 
-        print(Rc_test.shape)
+                scores.append(margin)
 
-        if len(Rc_test.shape) == 3:
-            Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2]))
-        elif len(Rc_test.shape) == 4:
-            Rc_test = np.reshape(Rc_test, (Rc_test.shape[0], Rc_test.shape[1] * Rc_test.shape[2] * Rc_test.shape[3]))
-
-        # compute sample weights
-        sample_weights = (1. - np.mean(test_labels)) * test_labels
-        sample_weights[sample_weights == 0.0] = np.mean(test_labels)
-
-        # compute score
-        score = clf.score(Rc_test, test_labels, sample_weight=sample_weights)
+                # compute sample weights
+                # sample_weights = (1. - np.mean(test_labels)) * test_labels
+                # sample_weights[sample_weights == 0.0] = np.mean(test_labels)
+                #
+                # # compute score
+                # score = clf.score(Rc_test, test_labels, sample_weight=sample_weights)
 
         print("separability score for class {}".format(classidx))
-        print(score)
+        print(np.mean(scores))
 
         resultdir = os.path.join(output_dir, "{}_{}".format(data_name, model_name))
 
         if not os.path.exists(resultdir):
             os.makedirs(resultdir)
 
-        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(score)]],
+        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(np.mean(scores))]],
                           columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
         df.to_csv("{}/{}_{}_{}.csv".format(resultdir, layer_name, rule, str(classidx)), index=False)
 

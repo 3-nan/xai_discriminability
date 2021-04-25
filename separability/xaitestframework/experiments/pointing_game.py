@@ -4,6 +4,7 @@ import numpy as np
 import time
 import tracemalloc
 import pandas as pd
+from scipy.ndimage import gaussian_filter
 
 from ..dataloading.custom import get_dataset
 from ..dataloading.dataloader import DataLoader
@@ -19,12 +20,12 @@ def get_explanation(relevance_path, data_name, model_name, layer, xai_method, fi
     explanation = np.load(fname + ".npy")
 
     if len(explanation.shape) == 3:
-        explanation = np.mean(explanation, axis=2)
+        explanation = np.mean(explanation, axis=2)   # np.max(explanation, axis=2)
     return explanation
 
 
 def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_path, partition, batch_size, model_name,
-                                 layer_names, xai_method, output_dir):
+                                 layer_names, xai_method, output_dir, gaussian_blur=True):
     """ Computes the pointing game score score. """
 
     if isinstance(layer_names, list):
@@ -38,7 +39,7 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
 
     # initialize dataset
     datasetclass = get_dataset(dataset_name)
-    dataset = datasetclass(data_path, "val")
+    dataset = datasetclass(data_path, partition)
     dataset.set_mode("raw")
 
     # iterate classes
@@ -63,6 +64,10 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
                 # get attribution to classidx
                 explanation = get_explanation(relevance_path, data_name, model_name, input_layer, xai_method,
                                               sample.filename, classidx)
+
+                if gaussian_blur:
+                    # add Gaussian Blur as advised in Zhang et al., 2018
+                    explanation = gaussian_filter(explanation, sigma=0.02 * np.max(explanation))
 
                 # find index of max value
                 maxindex = np.where(explanation == np.max(explanation))
@@ -127,6 +132,7 @@ if __name__ == "__main__":
                         help="Rule to be used to compute relevance maps")
     parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    parser.add_argument("-gb", "--gaussian_blur", type=bool, default=True, help="Boolean indicating if gaussian blur should be applied to attribution")
 
     ARGS = parser.parse_args()
 
@@ -147,7 +153,8 @@ if __name__ == "__main__":
                                  ARGS.model_name,
                                  ARGS.layer,
                                  ARGS.rule,
-                                 ARGS.output_dir)
+                                 ARGS.output_dir,
+                                 gaussian_blur=ARGS.gaussian_blur)
 
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10 ** 6}MB; Peak was {peak / 10 ** 6}MB")

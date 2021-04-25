@@ -198,7 +198,7 @@ def evaluate(filepath):
                 for xai_method in xai_methods:
                     xai_args = method_args + " -r " + xai_method
 
-                    if quantification in ["model_parameter_randomization", "pixelflipping"]:
+                    if quantification in ["model_parameter_randomization", "pixelflipping", "manifold_outlier_pixelflipping_experiment"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)
@@ -206,7 +206,7 @@ def evaluate(filepath):
                             job_args = xai_args + " -l " + layers[0]
                             job_args = job_args + " -cl " + str(idx)
 
-                            if quantification == "pixelflipping":
+                            if quantification == "pixelflipping" or quantification == "manifold_outlier_pixelflipping_experiment":
 
                                 job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
                                 percentages = ":".join([str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
@@ -228,6 +228,9 @@ def evaluate(filepath):
                     else:
                         for layer in layers:
                             job_args = xai_args + " -l " + layer
+
+                            if quantification == "pointing_game":
+                                job_args = job_args + " -gb " + str(quantification_dict[quantification]["args"]["gaussian_blur"])
 
                             if backend == "sge":
                                 submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
