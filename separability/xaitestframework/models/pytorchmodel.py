@@ -218,7 +218,7 @@ class PytorchModel(ModelInterface):
                 handles = [layer.register_forward_hook(hook) for layer in layers]
 
                 batch_tensor.requires_grad_()
-                output_relevance = eye[targets]
+                output_relevance = eye[targets]     # /out.abs()
 
                 out = modified(batch_tensor)
                 torch.autograd.backward((out,), (output_relevance,))

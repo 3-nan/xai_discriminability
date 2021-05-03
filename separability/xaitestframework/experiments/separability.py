@@ -12,7 +12,20 @@ from ..dataloading.dataloader import DataLoader
 from ..helpers.universal_helper import extract_filename, compute_relevance_path
 
 
-def load_explanations_for_sample(filename, classidx, classes, explanationdir):
+def scale_attribution(attribution):
+    """ Scale the attribution with abs sum. """
+
+    # what to do here?
+    # max is arbitrary, so sum is the preferred option
+    # best: abs(sum()), but sum might be 0
+    # therefore: sum(abs()), but not quite the same..
+    # maybe: max(abs())
+    attribution = attribution / np.sum(np.abs(attribution))
+
+    return attribution
+
+
+def load_attributions_for_sample(filename, classidx, classes, explanationdir):
     """ Load data for the svm classification. """
 
     if classidx in classes:
@@ -30,12 +43,16 @@ def load_explanations_for_sample(filename, classidx, classes, explanationdir):
     # target explanation
     attribution = np.load(os.path.join(explanationdir, str(classidx), extract_filename(filename)) + ".npy")
 
+    attribution = scale_attribution(attribution)
+
     Rs.append(attribution)
     labels.append(1)
 
     for idx in classindices:
         # non-target explanations
         attribution = np.load(os.path.join(explanationdir, str(idx), extract_filename(filename)) + ".npy")
+
+        attribution = scale_attribution(attribution)
 
         Rs.append(attribution)
         labels.append(0)
@@ -86,7 +103,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
             for sample in batch:
 
                 # load explanations for sample
-                Rs, labels = load_explanations_for_sample(sample.filename, classidx, class_indices, os.path.join(relevance_path, partition))
+                Rs, labels = load_attributions_for_sample(sample.filename, classidx, class_indices, os.path.join(relevance_path, partition))
 
                 if len(Rs.shape) == 3:
                     Rs = np.reshape(Rs, (Rs.shape[0], Rs.shape[1] * Rs.shape[2]))
@@ -94,11 +111,10 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
                     Rs = np.reshape(Rs, (Rs.shape[0], Rs.shape[1] * Rs.shape[2] * Rs.shape[3]))
 
                 # clf = LinearSVC(class_weight="balanced")
-                clf = LinearSVC(C=1000, class_weight="balanced")    # very high C (regularization parameter)
+                clf = LinearSVC(C=1000, class_weight="balanced", max_iter=100)    # very high C (regularization parameter)
                 clf.fit(Rs, labels)
 
-                # TODO: breite des margins der svm messen
-
+                # measure with of margin of trained SVM
                 margin = 1. / np.sqrt(np.sum(clf.coef_ ** 2))
 
                 scores.append(margin)
