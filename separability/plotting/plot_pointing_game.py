@@ -49,21 +49,27 @@ with open(filepath) as file:
     #
     # plt.show()
     #
-    # plt.figure()
-    # plt.bar(xai_methods, mean_scores)
-    #
-    # plt.xticks(rotation="45", ha="right")
-    # plt.xlabel("xai method")
-    # plt.ylabel("Scores")
-    # plt.title("Pointing Game (class-wise mean)")
-    # plt.show()
+    ind = np.arange(len(xai_methods))
+
+    fig, ax = plt.subplots()
+
+    for x, xai_method in enumerate(xai_methods):
+        ax.bar(ind - 0.25, mean_scores[x], 0.25, label=xai_method)
+        ax.bar(ind, mean_scores_u50[x], 0.25, label=xai_method)
+        ax.bar(ind + 0.25, mean_scores_u25[x], 0.25, label=xai_method)
+
+    plt.xticks(rotation="45", ha="right")
+    plt.xlabel("xai method")
+    plt.ylabel("Scores")
+    plt.title("Pointing Game (class-wise mean)")
+    plt.show()
 
     # write csv
-    d = {"xai_method": xai_methods,
-         "scores": mean_scores,
-         "scores_u50": mean_scores_u50,
-         "scores_u25": mean_scores_u25
-         }
-    df = pd.DataFrame(data=d)
-
-    df.to_csv("../results/pointing_game_with_blur.csv", index=False)
+    # d = {"xai_method": xai_methods,
+    #      "scores": mean_scores,
+    #      "scores_u50": mean_scores_u50,
+    #      "scores_u25": mean_scores_u25
+    #      }
+    # df = pd.DataFrame(data=d)
+    #
+    # df.to_csv("../results/pointing_game_with_blur.csv", index=False)

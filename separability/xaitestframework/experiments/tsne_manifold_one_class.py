@@ -150,26 +150,18 @@ def tsne_embedding_evaluation(data_path, data_name, dataset_name, explanationdir
     tsne_embedding = compute_tsne_embedding(data_path, dataset_name, "train", batch_size, model_path, model_name, model_type, layer_name, output_dir)
     print("t-SNE embedding computed.")
 
-    # add_points = False
-
     if add_points:
 
         datasetclass = get_dataset(dataset_name)
-        data = datasetclass(data_path, partition)
 
-        class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
+        idx = 15
 
-        class_indices = [2, 4, 6]
+        test_data = datasetclass(data_path, partition, classidx=[idx])
+        test_data.set_mode("preprocessed")
+        testloader = DataLoader(test_data, batch_size=batch_size)
 
-        # transform test data to tsne embedding
-        for idx in class_indices:
-
-            test_data = datasetclass(data_path, partition, classidx=[idx])
-            test_data.set_mode("preprocessed")
-            testloader = DataLoader(test_data, batch_size=batch_size)
-
-            transform_to_tsne_embedding(testloader, idx, tsne_embedding, explanationdir, model_path, model_name, model_type, layer_name, rule, distribution,
-                                        percentage_values, output_dir)
+        transform_to_tsne_embedding(testloader, idx, tsne_embedding, explanationdir, model_path, model_name, model_type, layer_name, rule, distribution,
+                                    percentage_values, output_dir)
 
 
 def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model_path, model_name, model_type, layer_name, output_dir):
@@ -179,9 +171,9 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
     datasetclass = get_dataset(dataset_name)
     data = datasetclass(data_path, partition)
 
-    class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
+    # class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
 
-    class_indices = [2, 4, 6]
+    idx = 15
 
     # load model
     model = init_model(model_path, model_name, framework=model_type)
@@ -190,27 +182,26 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
     X = []
     targets = []
 
-    for idx in class_indices:
-        class_data = datasetclass(data_path, partition, classidx=[idx])
-        class_data.set_mode("preprocessed")
-        trainloader = DataLoader(class_data, batch_size=batch_size, endidx=150)
+    class_data = datasetclass(data_path, partition, classidx=[idx])
+    class_data.set_mode("preprocessed")
+    trainloader = DataLoader(class_data, batch_size=batch_size) # , endidx=150)
 
-        for batch in trainloader:
-            data = np.array([b.datum for b in batch])
-            activations = model.get_activations(data, layer_name)
-            X.append([np.ravel(a) for a in activations])
+    for batch in trainloader:
+        data = np.array([b.datum for b in batch])
+        activations = model.get_activations(data, layer_name)
+        X.append([np.ravel(a) for a in activations])
 
-        targets.append(np.ones(len(trainloader.idx)) * int(idx))
+    targets = np.ones(len(trainloader.idx)) #   * int(idx)
 
     X = np.concatenate(X)
-    targets = np.concatenate(targets)
+    targets = np.array(targets)
 
     print("Data shape is {}".format(X.shape))
 
     # initialize tsne embedding
     affinities_train = PerplexityBasedNN(
         X,
-        perplexity=7,
+        perplexity=6,
         method="approx",
         # metric="euclidean",
         n_jobs=8,
@@ -233,15 +224,15 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
 
     # fit tsne embedding
     # tsne_embedding = tsne.fit(X)
-    # embedding_train_1 = tsne.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
-    embedding_train = tsne.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
-    embedding_train_1 = embedding_train.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
+    embedding_train_1 = tsne.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
+    # embedding_train = tsne.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
+    # embedding_train_1 = embedding_train.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
 
     # embedding_train_1 = embedding_train.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
 
     # save embedding
-    np.save(os.path.join(output_dir, "tsne_embedding_layer2_7.npy"), embedding_train_1)     # Todo add path
-    np.save(os.path.join(output_dir, "targets_layer2_7.npy"), targets)
+    np.save(os.path.join(output_dir, "tsne_embedding_layer_6.npy"), embedding_train_1)     # Todo add path
+    np.save(os.path.join(output_dir, "targets_layer_6.npy"), targets)
 
     return embedding_train_1
 

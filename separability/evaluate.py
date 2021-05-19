@@ -232,6 +232,13 @@ def evaluate(filepath):
                             if quantification == "pointing_game":
                                 job_args = job_args + " -gb " + str(quantification_dict[quantification]["args"]["gaussian_blur"])
 
+                            if quantification == "tsne_manifold" or quantification == "tsne_manifold_one_class":
+                                job_args = job_args + " -pd " + quantification_dict[quantification]["args"][
+                                    "distribution"]
+                                percentages = ":".join(
+                                    [str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
+                                job_args = job_args + " -pv " + percentages
+
                             if backend == "sge":
                                 submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
                                                   quantification, job_index)

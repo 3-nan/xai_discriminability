@@ -136,6 +136,26 @@ class PytorchModel(ModelInterface):
 
         return outputs.detach().cpu().numpy()
 
+    def get_activations(self, data, layer_name):
+        """ Compute activations for the specified layer. """
+        data_tensor = torch.as_tensor(data, device=self.device).permute(0, 3, 1, 2)
+
+        global activations
+
+        def hook_fn(module, input, output):
+            global activations
+            activations = output
+
+        hook = self.layer_dict[layer_name].register_forward_hook(hook_fn)
+
+        outputs = self.model(data_tensor)
+
+        hook.remove()
+        if layer_name in ["linear1", "linear2"]:
+            return activations.detach().cpu().numpy()
+        else:
+            return activations.detach().permute(0, 2, 3, 1).cpu().numpy()
+
     def get_layer_names(self, with_weights_only=False):
         """ Returns the layer names of the model. """
 
@@ -218,9 +238,10 @@ class PytorchModel(ModelInterface):
                 handles = [layer.register_forward_hook(hook) for layer in layers]
 
                 batch_tensor.requires_grad_()
-                output_relevance = eye[targets]     # /out.abs()
 
                 out = modified(batch_tensor)
+
+                output_relevance = eye[targets]/out.abs()       # /out.abs() removes model confidence from attributions
                 torch.autograd.backward((out,), (output_relevance,))
 
                 for handle in handles:
