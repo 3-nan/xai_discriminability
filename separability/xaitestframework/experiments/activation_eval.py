@@ -145,8 +145,10 @@ def load_explanations(explanationdir, samples, classidx):
 def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevance_path, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values):
     """ Wrapper function to load data/model and compute directory paths. """
 
+    # n_neighbors = 20
+
     # construct explanationdir
-    explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
+    explanationdir = compute_relevance_path(relevance_path, data_name, model_name, "conv1", rule)
     explanationdir = os.path.join(explanationdir, partition)
 
     # init model
@@ -154,46 +156,57 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
-    class_data = datasetclass(data_path, partition, classidx=[classidx])
-    class_data.set_mode("preprocessed")
 
-    dataloader = DataLoader(class_data, batch_size=batch_size)
 
-    # run pixelflipping computation
-    class_score = compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, classidx, rule, distribution, percentage_values)
+    # load test data
+    test_data = datasetclass(data_path, partition, classidx=[classidx])
+    test_data.set_mode("preprocessed")
+
+    testloader = DataLoader(test_data, batch_size=batch_size)
+
+    # run nearest neighbor computation
+    scores, diffs, zero_diffs = compute_zero_activation_ratio(testloader, model, layer_name, explanationdir, classidx, rule, distribution, percentage_values)
 
     # collect results and write to file
     results = []
-    for key in class_score:
-        results.append([data_name, model_name, rule, str(key), str(class_score[key])])
+    for key in scores:
+        # for threshold in scores[key]:
+        results.append([data_name, model_name, rule, str(key)])     # , str(scores[key]), diffs[key], zero_diffs[key]])
+        np.save(os.path.join(output_dir, "scores_{}_{}_{}_{}_{}_{}_{}.npy".format(data_name, model_name, layer_name, rule, distribution, str(classidx), str(key))), scores)
+        np.save(os.path.join(output_dir, "diffs_{}_{}_{}_{}_{}_{}_{}.npy".format(data_name, model_name, layer_name, rule, distribution, str(classidx), str(key))), diffs)
+        np.save(os.path.join(output_dir, "zero_diffs_{}_{}_{}_{}_{}_{}_{}.npy".format(data_name, model_name, layer_name, rule, distribution, str(classidx), str(key))), zero_diffs)
 
-    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'flipped_score'])
+    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage'])
     df.to_csv(
-        os.path.join(output_dir, "{}_{}_{}_{}_{}.csv".format(data_name, model_name, rule, distribution, str(classidx))),
+        os.path.join(output_dir, "{}_{}_{}_{}_{}_{}.csv".format(data_name, model_name, layer_name, rule, distribution, str(classidx))),
         index=False)
 
 
-def compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, classidx, rule, distribution, percentage_values):
+def compute_zero_activation_ratio(dataloader, model, layer_name, explanationdir, classidx, rule, distribution, percentage_values):
     """ Estimate the pixelflipping score. """
 
     print("compute score for classidx {}".format(classidx))
 
-    save_examples = False
+    # thresholds = [1e-4, 1e-8, 1e-12, 1e-16, 1e-20]
 
-    if save_examples:
-        examples_dir = os.path.join(output_dir, "examples", rule, str(classidx), distribution)
-        if not os.path.exists(examples_dir):
-            os.makedirs(examples_dir)
+    threshold = 1e-12
 
     # prep result structure
-    class_score = {}
+    scores = {}
+    diffs = {}
+    zero_diffs = {}
+
     for percentage in percentage_values:
-        class_score[percentage] = []
+        scores[percentage] = []     # {}
+
+        # for threshold in thresholds:
+        #     scores[percentage][threshold] = []
+
+        diffs[percentage] = []
+        zero_diffs[percentage] = []
 
     # iterate data
     for b, batch in enumerate(dataloader):
-
-        # data = [sample.datum for sample in batch]
 
         if rule != "random":
             # get/sort indices for pixelflipping order
@@ -233,21 +246,34 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, c
 
                 flipped_data = flipping_method(batch, indicesfraction, distribution)
 
-            # compute score on flipped data
-            # predictions = model.predict(flipped_data, batch_size=len(flipped_data))
-            predictions = model.predict(flipped_data, batch_size=len(flipped_data))
+            # get activations
+            activations = model.get_activations(np.array(flipped_data), layer_name)
+            # flipped_data = np.array([np.ravel(a) for a in activations])
 
-            # save examples
-            if save_examples and b == 0:
-                for d, datapoint in enumerate(flipped_data[:10]):
-                    np.save(os.path.join(examples_dir, extract_filename(batch[d].filename)) + "_" + str(percentage) + ".npy", datapoint)
+            if percentage == 0:
+                initial_activations = activations
 
-            class_score[percentage].append(predictions[:, classidx])
+            # zero_activations = np.where(activations < 0.00001)
+            for a, activation in enumerate(activations):
 
-    for percentage in percentage_values:
-        class_score[percentage] = np.mean(np.concatenate(class_score[percentage]))
+                # for threshold in thresholds:
+                #     scores[percentage][threshold].append(np.mean(activation < threshold))      # ToDo multiple thresholds
+                scores[percentage].append(np.mean(activation < threshold))
 
-    return class_score
+                diffs[percentage].append(np.linalg.norm(activation - initial_activations[a]))
+                zero_diffs[percentage].append(np.linalg.norm(activation))
+
+
+            # scores[percentage].append(zero_activations)
+
+    # for percentage in percentage_values:
+        # diffs[percentage] = np.mean(diffs[percentage])
+        # zero_diffs[percentage] = np.mean(zero_diffs[percentage])
+        # for threshold in thresholds:
+        #     scores[percentage][threshold] = np.mean(scores[percentage][threshold])
+        # scores[percentage] = np.mean(scores[percentage])
+
+    return scores, diffs, zero_diffs
 
 
 if __name__ == "__main__":

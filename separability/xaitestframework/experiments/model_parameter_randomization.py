@@ -123,7 +123,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, input_layer, ex
                 assert(original_explanation.shape == explanation.shape)
 
                 # save if save_examples == True
-                if b == 0 and save_examples:
+                if (b == 0) and save_examples and (i < 10):
                     np.save(os.path.join(example_dir, extract_filename(batch[i].filename)) + "_original.npy", original_explanation)
                     np.save(os.path.join(example_dir, extract_filename(batch[i].filename)) + "_" + layer_name + ".npy", explanation)
 

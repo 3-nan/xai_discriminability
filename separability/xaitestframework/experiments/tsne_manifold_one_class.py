@@ -139,29 +139,174 @@ def load_explanations(explanationdir, samples, classidx):
     return np.array(explanations)
 
 
+def flip_data(dataloader, explanationdir, classidx, model_path, model_name, model_type, layer_name, rule, distribution, percentage):
+    """ Estimate the pixelflipping score. """
+
+    print("compute score for classidx {}".format(classidx))
+
+    model = init_model(model_path, model_name, model_type)
+
+    X_flipped = []
+
+    # iterate data
+    for b, batch in enumerate(dataloader):
+
+        if rule != "random":
+            # get/sort indices for pixelflipping order
+            explanations = load_explanations(explanationdir, batch, classidx)
+            # reduce explanations dimension
+            explanations = np.max(explanations, axis=3)         # ToDo make compliant according to method
+
+            if rule in ["Gradient", "SmoothGrad", "LRPZ"]:
+                indices = [np.argsort(np.abs(explanation), axis=None) for explanation in explanations]
+            else:
+                indices = [np.argsort(explanation, axis=None) for explanation in explanations]
+
+            indices = np.array(indices)
+
+        else:
+            # random
+            indices = [np.argsort(np.max(sample.datum, axis=2), axis=None) for sample in batch]
+            indices = np.array(indices)
+            np.random.shuffle(indices)
+
+        print(indices.shape)
+
+        if percentage == 0:
+            flipped_data = np.array([sample.datum for sample in batch])
+
+        else:
+
+            # get first percentage part of pixel indices (lowest relevance)
+            # indicesfraction = indices[:, :int(flip_percentage * len(indices))]
+            # get last percentage part of pixel indices (highest relevance)
+            indicesfraction = indices[:, int((1 - percentage) * indices.shape[1]):]
+
+            flipping_method = FLIPPING_METHODS[distribution]
+
+            flipped_data = flipping_method(batch, indicesfraction, distribution)
+
+        # ravel
+        activations = model.get_activations(np.array(flipped_data), layer_name)
+        flipped_data = np.array([np.ravel(a) for a in activations])
+
+        # embed flipped data
+        X_flipped.append(flipped_data)
+
+    return np.concatenate(X_flipped)
+
+
 def tsne_embedding_evaluation(data_path, data_name, dataset_name, explanationdir, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values, add_points=True):
 
+    os.makedirs(os.path.join(output_dir, layer_name, distribution), exist_ok=True)
+    output_dir = os.path.join(output_dir, layer_name, distribution)
     # compute explanation dir
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, "conv1", rule)
     explanationdir = os.path.join(explanationdir, partition)
 
     # compute tsne embedding
     print("Computing tsne embedding for train data.")
-    tsne_embedding = compute_tsne_embedding(data_path, dataset_name, "train", batch_size, model_path, model_name, model_type, layer_name, output_dir)
+    datasetclass = get_dataset(dataset_name)
+
+    # class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
+
+    idx = 15
+
+    # load model
+    model = init_model(model_path, model_name, framework=model_type)
+
+    # load data for tsne embedding computation
+    X = []
+    targets = []
+
+    class_data = datasetclass(data_path, "train", classidx=[idx])
+    class_data.set_mode("preprocessed")
+    trainloader = DataLoader(class_data, batch_size=batch_size)  # , endidx=150)
+
+    for batch in trainloader:
+        data = np.array([b.datum for b in batch])
+        activations = model.get_activations(data, layer_name)
+        X.append([np.ravel(a) for a in activations])
+
+    targets = np.ones(len(trainloader.idx))  # * int(idx)
+
+    # add flipped data
+    test_data = datasetclass(data_path, "val", classidx=[idx])
+    test_data.set_mode("preprocessed")
+    test_loader = DataLoader(test_data, batch_size=batch_size)
+
+    for p, percentage in enumerate(percentage_values):
+        X_flipped = flip_data(test_loader, explanationdir, idx, model_path, model_name, model_type, layer_name, rule, distribution, percentage)
+        X.append(X_flipped)
+        targets = np.concatenate((targets, np.ones(X_flipped.shape[0]) * (p + 1)))
+
+    X = np.concatenate(X)
+    targets = np.array(targets)
+
+    print("Data shape is {}".format(X.shape))
+
+    # initialize tsne embedding
+    affinities_train = PerplexityBasedNN(
+        X,
+        perplexity=30,
+        method="exact",
+        # metric="euclidean",
+        n_jobs=8,
+        random_state=42,
+    )
+
+    init_train = initialization.pca(X, random_state=42)
+
+    tsne = TSNEEmbedding(
+        init_train,
+        affinities_train,
+        negative_gradient_method="fft",
+        n_jobs=8,
+        # perplexity=30,
+        # metric="euclidean",
+        # callbacks=ErrorLogger(),
+        # n_jobs=8,
+        # random_state=42
+    )
+
+    # fit tsne embedding
+    # tsne_embedding = tsne.fit(X)
+    embedding_train_1 = tsne.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
+    # embedding_train = tsne.optimize(n_iter=250, exaggeration=12, momentum=0.5, inplace=True)
+    # embedding_train_1 = embedding_train.optimize(n_iter=750, exaggeration=1, momentum=0.8, inplace=True)
+
+    # embedding_train_1 = embedding_train.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
+
+    # save embedding
+    np.save(os.path.join(output_dir, "tsne_embedding.npy"), embedding_train_1)  # Todo add path
+    np.save(os.path.join(output_dir, "targets.npy"), targets)
     print("t-SNE embedding computed.")
 
-    if add_points:
 
-        datasetclass = get_dataset(dataset_name)
 
-        idx = 15
-
-        test_data = datasetclass(data_path, partition, classidx=[idx])
-        test_data.set_mode("preprocessed")
-        testloader = DataLoader(test_data, batch_size=batch_size)
-
-        transform_to_tsne_embedding(testloader, idx, tsne_embedding, explanationdir, model_path, model_name, model_type, layer_name, rule, distribution,
-                                    percentage_values, output_dir)
+# def tsne_embedding_evaluation(data_path, data_name, dataset_name, explanationdir, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values, add_points=True):
+#
+#     # compute explanation dir
+#     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, "conv1", rule)
+#     explanationdir = os.path.join(explanationdir, partition)
+#
+#     # compute tsne embedding
+#     print("Computing tsne embedding for train data.")
+#     tsne_embedding = compute_tsne_embedding(data_path, dataset_name, "train", batch_size, model_path, model_name, model_type, layer_name, output_dir)
+#     print("t-SNE embedding computed.")
+#
+#     if add_points:
+#
+#         datasetclass = get_dataset(dataset_name)
+#
+#         idx = 15
+#
+#         test_data = datasetclass(data_path, partition, classidx=[idx])
+#         test_data.set_mode("preprocessed")
+#         testloader = DataLoader(test_data, batch_size=batch_size)
+#
+#         transform_to_tsne_embedding(testloader, idx, tsne_embedding, explanationdir, model_path, model_name, model_type, layer_name, rule, distribution,
+#                                     percentage_values, output_dir)
 
 
 def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model_path, model_name, model_type, layer_name, output_dir):

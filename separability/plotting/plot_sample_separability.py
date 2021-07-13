@@ -88,33 +88,36 @@ with open(filepath) as file:
     handles, labels = ax.get_legend_handles_labels()
 
     plt.xticks(x, layers)
-    plt.xlabel("xai method")
-    plt.ylabel("class-wise mean of separability scores")
+    plt.xlabel("Layer")
+    plt.ylabel("class-wise mean of margins")
     plt.legend(handles[::n_classes], configs["xai_methods"])
     plt.show()
 
-    # plt.figure()
-    #
-    # for xai_method in configs["xai_methods"]:
-    #     scores = []
-    #
-    #     for layer in layers:
-    #
-    #         layer_scores = []
-    #
-    #         for classidx in classindices:
-    #             try:
-    #                 csv = pd.read_csv(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv")
-    #                 layer_scores.append(float(csv["separability_score"]))
-    #             except FileNotFoundError:
-    #                 print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
-    #             # print(float(csv["separability_score"]))
-    #
-    #         scores.append(np.mean(layer_scores))
-    #
-    #     plt.plot(layers, scores)
-    #
-    # plt.xlabel("xai method")
-    # plt.ylabel("class-wise mean of separability scores")
-    # plt.legend(configs["xai_methods"])
-    # plt.show()
+    plt.figure()
+
+    for m, xai_method in enumerate(configs["xai_methods"]):
+        scores = []
+
+        for layer in layers:
+
+            layer_scores = []
+
+            for c, classidx in enumerate(classindices):
+
+                try:
+                    csv = pd.read_csv(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv")
+                    layer_scores.append(float(csv["sample_ap"]))
+                except FileNotFoundError:
+                    print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
+                    layer_scores.append(0.)
+
+                # print(float(csv["separability_score"]))
+
+            scores.append(np.mean(layer_scores))
+
+        plt.plot(layers, scores)
+
+    plt.xlabel("xai method")
+    plt.ylabel("class-wise mean of separability scores")
+    plt.legend(configs["xai_methods"])
+    plt.show()

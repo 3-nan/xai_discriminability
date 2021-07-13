@@ -11,6 +11,7 @@ import seaborn as sns
 
 filepath = "configs/config_experiments.yaml"
 
+"""
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
@@ -83,10 +84,58 @@ with open(filepath) as file:
     # plt.show()
 
     plt.savefig("../results/figures/pixelflipping_{}".format(distribution), format="svg")
+"""
 
+with open(filepath) as file:
+    configs = yaml.load(file, Loader=yaml.FullLoader)
 
-def lineplot(data, xlabel, ylabel):
+    xai_method = "epsilon_plus"
+    distributions = ["uniform", "gaussian", "inpaint_telea", "inpaint_ns"]
+    resultdir = "../results/pixelflipping"
 
-    plot = sns.lineplot(x=xlabel, y=ylabel, data=data)
+    resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 
-    return plot
+    log_scale = False
+
+    layers = [configs["layers"][0]]
+    classindices = range(20)
+    # classindices = [2, 4, 6]
+
+    # build mean over classes
+    plt.figure()
+
+    for distribution in distributions:
+
+        method_scores = []
+
+        for classidx in classindices:
+            try:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
+            except FileNotFoundError:
+                csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
+            # print(float(csv["separability_score"]))
+            # print(csv)
+            percentages = csv["flip_percentage"]
+            scores = csv["flipped_score"]
+
+            method_scores.append(scores)
+
+        method_scores = np.array(method_scores)
+        method_scores = np.mean(method_scores, axis=0)
+
+        plt.plot(percentages, method_scores)
+
+    plt.xlabel("percentage of flipped pixels")
+    plt.ylabel("score")
+
+    if log_scale:
+        plt.xscale("log")
+
+    plt.title("Pixelflipping (class-wise mean) with method {}".format(xai_method))
+    plt.legend(distributions)
+
+    plt.tight_layout()
+
+    # plt.show()
+    plt.savefig("../results/figures/pixelflipping/auc.svg")
+    # plt.savefig("../results/figures/pixelflipping_{}".format(distribution), format="svg")

@@ -198,29 +198,43 @@ def evaluate(filepath):
                 for xai_method in xai_methods:
                     xai_args = method_args + " -r " + xai_method
 
-                    if quantification in ["model_parameter_randomization", "pixelflipping", "manifold_outlier_pixelflipping_experiment"]:
+                    if quantification in ["model_parameter_randomization", "pixelflipping", "manifold_outlier_pixelflipping_experiment", "activation_eval"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)
 
-                            job_args = xai_args + " -l " + layers[0]
-                            job_args = job_args + " -cl " + str(idx)
+                            # job_args = xai_args + " -l " + layers[0]
+                            job_args = xai_args + " -cl " + str(idx)
 
                             if quantification == "pixelflipping" or quantification == "manifold_outlier_pixelflipping_experiment":
+
+                                job_args = job_args + " -l " + layers[0]
+                                job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
+                                percentages = ":".join([str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
+                                job_args = job_args + " -pv " + percentages
+
+                            elif quantification == "activation_eval":
 
                                 job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
                                 percentages = ":".join([str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
                                 job_args = job_args + " -pv " + percentages
 
+                                for layer in layers:
+                                    job_args_2 = job_args + " -l " + layer
+                                    submit_on_sungrid(job_args_2, configs, quantification_dict[quantification]["config"],
+                                                      quantification, job_index)
+                                    job_index += 1
+
                             elif quantification == "model_parameter_randomization":
 
+                                job_args = job_args + " -l " + layers[0]
                                 if quantification_dict[quantification]["args"]["max_index"]:
                                     job_args = job_args + " -mi " + str(quantification_dict[quantification]["args"]["max_index"])
                                 if quantification_dict[quantification]["args"]["distance_measures"]:
                                     job_args = job_args + " -dm " + ":".join(quantification_dict[quantification]["args"]["distance_measures"])
 
                             # submit
-                            if backend == "sge":
+                            if backend == "sge" and quantification != "activation_eval":
                                 submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
                                                   quantification, job_index)
                                 job_index += 1

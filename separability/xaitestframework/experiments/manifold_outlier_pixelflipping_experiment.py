@@ -150,11 +150,11 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     n_neighbors = 20
 
     # construct explanationdir
-    explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
+    explanationdir = compute_relevance_path(relevance_path, data_name, model_name, "conv1", rule)
     explanationdir = os.path.join(explanationdir, partition)
 
     # init model
-    # model = init_model(model_path, model_name, framework=model_type)
+    model = init_model(model_path, model_name, framework=model_type)
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
@@ -166,7 +166,10 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     X = []
 
     for batch in trainloader:
-        X.append([np.ravel(b.datum) for b in batch])
+        data = np.array([b.datum for b in batch])
+        activations = model.get_activations(data, layer_name)
+        X.append([np.ravel(a) for a in activations])
+        # X.append([np.ravel(b.datum) for b in batch])
 
     X = np.concatenate(X)
 
@@ -184,22 +187,26 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
     testloader = DataLoader(test_data, batch_size=batch_size)
 
     # run nearest neighbor computation
-    kappa_scores, gamma_scores, delta_scores = compute_nearest_neighbor_score(testloader, nbrs, X, explanationdir,
-                                                                              classidx, rule, distribution, percentage_values)
+    kappa_scores, gamma_scores, delta_scores, initial_kappa_scores, initial_gamma_scores, initial_delta_scores = \
+        compute_nearest_neighbor_score(testloader, model, layer_name, nbrs, X, explanationdir, classidx, rule, distribution, percentage_values)
 
     # collect results and write to file
     results = []
     for key in kappa_scores:
         results.append([data_name, model_name, rule,
-                        str(key), str(kappa_scores[key]), str(gamma_scores[key]), str(delta_scores[key])])
+                        str(key), str(kappa_scores[key]), str(gamma_scores[key]), str(delta_scores[key]),
+                        str(initial_kappa_scores[key]), str(initial_gamma_scores[key]), str(initial_delta_scores[key])])
 
-    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'kappa', 'gamma', 'delta'])
+    df = pd.DataFrame(results, columns=['dataset', 'model', 'method', 'flip_percentage', 'kappa', 'gamma', 'delta',
+                                        'initial_kappa', 'initial_gamma', 'initial_delta'])
+
+    os.makedirs(os.path.join(output_dir, layer_name), exist_ok=True)
     df.to_csv(
-        os.path.join(output_dir, "{}_{}_{}_{}_{}.csv".format(data_name, model_name, rule, distribution, str(classidx))),
+        os.path.join(output_dir, layer_name, "{}_{}_{}_{}_{}.csv".format(data_name, model_name, rule, distribution, str(classidx))),
         index=False)
 
 
-def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx, rule, distribution, percentage_values):
+def compute_nearest_neighbor_score(dataloader, model, layer_name, nbrs, X, explanationdir, classidx, rule, distribution, percentage_values):
     """ Estimate the pixelflipping score. """
 
     print("compute score for classidx {}".format(classidx))
@@ -218,10 +225,18 @@ def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx
     gamma_scores = {}
     delta_scores = {}
 
+    initial_kappa_scores = {}
+    initial_gamma_scores = {}
+    initial_delta_scores = {}
+
     for percentage in percentage_values:
         kappa_scores[percentage] = []
         gamma_scores[percentage] = []
         delta_scores[percentage] = []
+
+        initial_kappa_scores[percentage] = []
+        initial_gamma_scores[percentage] = []
+        initial_delta_scores[percentage] = []
 
     # iterate data
     for b, batch in enumerate(dataloader):
@@ -264,8 +279,18 @@ def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx
 
                 flipped_data = flipping_method(batch, indicesfraction, distribution)
 
+            # get activations
+            activations = model.get_activations(np.array(flipped_data), layer_name)
+            flipped_data = np.array([np.ravel(a) for a in activations])
+            # flipped_data = np.array([np.ravel(p) for p in flipped_data])
+
             # compute nearest neighbours
-            nbr_distances, nbr_ind = nbrs.kneighbors([np.ravel(f) for f in flipped_data])
+            nbr_distances, nbr_ind = nbrs.kneighbors(flipped_data)
+
+            # save initial nearest neighbors
+            if percentage == 0.0:
+                initial_nbr_ind = nbr_ind
+                initial_nbrs = X[initial_nbr_ind]
 
             # compute paper indices: Harmeling et al, 2006, From outliers to prototypes: Ordering data
             kappas = nbr_distances[:, -1]
@@ -274,18 +299,29 @@ def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx
 
             deltas = []
 
+            initial_kappas = []
+            initial_gammas = []
+            initial_deltas = []
+
             neighbor_points = X[nbr_ind]
 
             for p, point in enumerate(flipped_data):
                 r_point = np.ravel(point)
-                # compute length of mean of distance vectors to first k neighbours
-                diffs = np.array([r_point - neighbor_point for neighbor_point in neighbor_points[p]])
+
+                # compute initial kappas
+                initial_kappas.append(distance_function(r_point, initial_nbrs[p][-1]))
+                # compute initial gammas
+                initial_gammas.append(np.mean(np.array([distance_function(r_point, initial_nbr) for initial_nbr in initial_nbrs[p]])))
+
+                # deltas: compute length of mean of distance vectors to first k neighbours
                 delta_vector = np.mean(np.array([r_point - neighbor_point for neighbor_point in neighbor_points[p]]), axis=0)
-                # print("r_point shape is : {}".format(r_point.shape))
-                # print("nb points shape is: {}".format(np.array(neighbor_points).shape))
-                # print("diffs shape is: {}".format(diffs.shape))
-                # print("delta vector shape is : {}".format(delta_vector.shape))
+                # deltas for initial points
+                initial_delta_vector = np.mean(np.array([r_point - initial_nbr for initial_nbr in initial_nbrs[p]]), axis=0)
+
+                # append results
                 deltas.append(distance_function(r_point, r_point + delta_vector))
+                initial_deltas.append(distance_function(r_point, r_point + initial_delta_vector))
+
 
             # save examples
             # if save_examples and b == 0:
@@ -296,12 +332,20 @@ def compute_nearest_neighbor_score(dataloader, nbrs, X, explanationdir, classidx
             gamma_scores[percentage].append(gammas)
             delta_scores[percentage].append(np.array(deltas))
 
+            initial_kappa_scores[percentage].append(np.array(initial_kappas))
+            initial_gamma_scores[percentage].append(np.array(initial_gammas))
+            initial_delta_scores[percentage].append(np.array(initial_deltas))
+
     for percentage in percentage_values:
         kappa_scores[percentage] = np.mean(np.concatenate(kappa_scores[percentage]))
         gamma_scores[percentage] = np.mean(np.concatenate(gamma_scores[percentage]))
         delta_scores[percentage] = np.mean(np.concatenate(delta_scores[percentage]))
 
-    return kappa_scores, gamma_scores, delta_scores
+        initial_kappa_scores[percentage] = np.mean(np.concatenate(initial_kappa_scores[percentage]))
+        initial_gamma_scores[percentage] = np.mean(np.concatenate(initial_gamma_scores[percentage]))
+        initial_delta_scores[percentage] = np.mean(np.concatenate(initial_delta_scores[percentage]))
+
+    return kappa_scores, gamma_scores, delta_scores, initial_kappa_scores, initial_gamma_scores, initial_delta_scores
 
 
 if __name__ == "__main__":

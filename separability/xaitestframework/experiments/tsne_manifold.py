@@ -141,6 +141,8 @@ def load_explanations(explanationdir, samples, classidx):
 
 def tsne_embedding_evaluation(data_path, data_name, dataset_name, explanationdir, partition, batch_size, model_path, model_name, model_type, layer_name, rule, distribution, output_dir, percentage_values, add_points=True):
 
+    os.makedirs(os.path.join(output_dir, layer_name, distribution), exist_ok=True)
+    output_dir = os.path.join(output_dir, layer_name, distribution)
     # compute explanation dir
     explanationdir = compute_relevance_path(explanationdir, data_name, model_name, "conv1", rule)
     explanationdir = os.path.join(explanationdir, partition)
@@ -159,7 +161,7 @@ def tsne_embedding_evaluation(data_path, data_name, dataset_name, explanationdir
 
         class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
 
-        class_indices = [2, 4, 6]
+        class_indices = [3, 8, 12]
 
         # transform test data to tsne embedding
         for idx in class_indices:
@@ -181,7 +183,8 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
 
     class_indices = [str(data.classname_to_idx(name)) for name in data.classes]
 
-    class_indices = [2, 4, 6]
+    # class_indices = [2, 4, 6]
+    class_indices = [3, 8, 12]
 
     # load model
     model = init_model(model_path, model_name, framework=model_type)
@@ -210,8 +213,8 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
     # initialize tsne embedding
     affinities_train = PerplexityBasedNN(
         X,
-        perplexity=7,
-        method="approx",
+        perplexity=30,
+        method="exact",     #    "approx",
         # metric="euclidean",
         n_jobs=8,
         random_state=42,
@@ -240,8 +243,8 @@ def compute_tsne_embedding(data_path, dataset_name, partition, batch_size, model
     # embedding_train_1 = embedding_train.optimize(n_iter=500, exaggeration=1, momentum=0.8, inplace=True)
 
     # save embedding
-    np.save(os.path.join(output_dir, "tsne_embedding_layer2_7.npy"), embedding_train_1)     # Todo add path
-    np.save(os.path.join(output_dir, "targets_layer2_7.npy"), targets)
+    np.save(os.path.join(output_dir, "tsne_embedding_30.npy"), embedding_train_1)     # Todo add path
+    np.save(os.path.join(output_dir, "targets_30.npy"), targets)
 
     return embedding_train_1
 

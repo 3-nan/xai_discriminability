@@ -8,10 +8,15 @@ import matplotlib.pyplot as plt
 
 filepath = "configs/config_experiments.yaml"
 
+blur = True
+
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
-    resultdir = "../results/pointing_game/with_blur"
+    resultdir = "../results/pointing_game"
+
+    if blur:
+        resultdir += "/blur"
 
     resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
 
@@ -51,17 +56,20 @@ with open(filepath) as file:
     #
     ind = np.arange(len(xai_methods))
 
+    print(mean_scores)
+
     fig, ax = plt.subplots()
 
-    for x, xai_method in enumerate(xai_methods):
-        ax.bar(ind - 0.25, mean_scores[x], 0.25, label=xai_method)
-        ax.bar(ind, mean_scores_u50[x], 0.25, label=xai_method)
-        ax.bar(ind + 0.25, mean_scores_u25[x], 0.25, label=xai_method)
+    # for x, xai_method in enumerate(xai_methods):
+    ax.bar(ind - 0.25, mean_scores, 0.25, label=xai_methods)
+    ax.bar(ind, mean_scores_u50, 0.25, label=xai_methods)
+    ax.bar(ind + 0.25, mean_scores_u25, 0.25, label=xai_methods)
 
-    plt.xticks(rotation="45", ha="right")
-    plt.xlabel("xai method")
+    plt.xticks(ind, labels=xai_methods, rotation="25", ha="right")
+    plt.xlabel("XAI method")
     plt.ylabel("Scores")
     plt.title("Pointing Game (class-wise mean)")
+    plt.tight_layout()
     plt.show()
 
     # write csv

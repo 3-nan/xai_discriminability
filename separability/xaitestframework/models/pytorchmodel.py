@@ -7,11 +7,15 @@ from captum.attr import (Deconvolution, GradientAttribution, IntegratedGradients
                          LayerGradCam,
                          LayerDeepLift,
                          LayerIntegratedGradients)
+from zennit.torchvision import VGGCanonizer
+from zennit.rules import *
+from zennit.composites import *
 
-from ..explainers.zennit.torchvision import VGGCanonizer
-from ..explainers.zennit.composites import COMPOSITES, LAYER_MAP_BASE, LayerMapComposite
-from ..explainers.zennit.rules import *
 from ..explainers.composites import *
+# from ..explainers.zennit.torchvision import VGGCanonizer
+# from ..explainers.zennit.composites import COMPOSITES, LAYER_MAP_BASE, LayerMapComposite
+# from ..explainers.zennit.rules import *
+# from ..explainers.composites import *
 from .modelinterface import ModelInterface
 
 
@@ -151,7 +155,7 @@ class PytorchModel(ModelInterface):
         outputs = self.model(data_tensor)
 
         hook.remove()
-        if layer_name in ["linear1", "linear2"]:
+        if layer_name in ["linear1", "linear2", "linear3"]:
             return activations.detach().cpu().numpy()
         else:
             return activations.detach().permute(0, 2, 3, 1).cpu().numpy()

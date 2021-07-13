@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
+from sklearn.metrics import average_precision_score
 import tracemalloc
 
 from ..dataloading.custom import get_dataset
@@ -89,6 +90,7 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         print("estimate one class separability for class " + classidx)
 
         scores = []
+        aps = []
 
         # load dataset for this class
         class_data = datasetclass(data_path, partition, classidx=[classidx])
@@ -126,6 +128,16 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
                 # # compute score
                 # score = clf.score(Rc_test, test_labels, sample_weight=sample_weights)
 
+                target = np.array(Rs[0] >= 0.)
+
+                assert target.shape == Rs[0].shape
+
+                ap = np.mean([average_precision_score(target, r, average="samples") for r in Rs[1:]])
+
+                aps.append(ap)
+
+
+
         print("separability score for class {}".format(classidx))
         print(np.mean(scores))
 
@@ -134,8 +146,8 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         if not os.path.exists(resultdir):
             os.makedirs(resultdir)
 
-        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(np.mean(scores))]],
-                          columns=['dataset', 'model', 'layer', 'method', 'separability_score'])
+        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(np.mean(scores)), str(np.mean(aps))]],
+                          columns=['dataset', 'model', 'layer', 'method', 'separability_score', 'sample_ap'])
         df.to_csv("{}/{}_{}_{}.csv".format(resultdir, layer_name, rule, str(classidx)), index=False)
 
 
