@@ -25,14 +25,15 @@ dirs:
   outputdir: /data/cluster/users/motzkus/results
 
 layers:
-  - input_1
-#  - block1_conv1
-#  - block2_conv1
-#  - block3_conv1
-#  - block4_conv1
-#  - block5_conv1
-#  - fc1
-#  - fc2
+  - conv1
+  - conv3
+  - conv5
+  - conv8
+  - conv11
+  - conv13
+  - linear1
+  - linear2
+  - linear3
 
 xai_methods:
 #  - LRPZ

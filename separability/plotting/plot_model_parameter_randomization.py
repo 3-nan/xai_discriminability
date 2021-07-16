@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 filepath = "configs/config_experiments.yaml"
 
-option = "independent"
+option = "cascading_top_down"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
@@ -89,5 +89,5 @@ with open(filepath) as file:
         plt.legend(configs["xai_methods"])
         plt.title("MPR with distance measure {} for option {}".format(measure, option))
         # plt.show()
-        plt.savefig("../results/figures/mpr_{}_{}".format(measure, option), format="svg")
+        plt.savefig("../results/figures/mpr/{}_{}".format(measure, option), format="svg")
         plt.close()

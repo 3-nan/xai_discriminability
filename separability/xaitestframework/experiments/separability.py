@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 from sklearn.svm import LinearSVC
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, f1_score
 import tracemalloc
 
 from ..dataloading.custom import get_dataset
@@ -22,6 +22,7 @@ def scale_attribution(attribution):
     # therefore: sum(abs()), but not quite the same..
     # maybe: max(abs())
     attribution = attribution / np.sum(np.abs(attribution))
+    attribution = attribution / np.max(np.abs(attribution))
 
     return attribution
 
@@ -91,6 +92,9 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
         scores = []
         aps = []
+        f1s = []
+        aps_robust = []
+        f1s_robust = []
 
         # load dataset for this class
         class_data = datasetclass(data_path, partition, classidx=[classidx])
@@ -113,13 +117,13 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
                     Rs = np.reshape(Rs, (Rs.shape[0], Rs.shape[1] * Rs.shape[2] * Rs.shape[3]))
 
                 # clf = LinearSVC(class_weight="balanced")
-                clf = LinearSVC(C=1000, class_weight="balanced", max_iter=100)    # very high C (regularization parameter)
-                clf.fit(Rs, labels)
-
-                # measure with of margin of trained SVM
-                margin = 1. / np.sqrt(np.sum(clf.coef_ ** 2))
-
-                scores.append(margin)
+                # clf = LinearSVC(C=1000, class_weight="balanced", max_iter=100)    # very high C (regularization parameter)
+                # clf.fit(Rs, labels)
+                #
+                # # measure with of margin of trained SVM
+                # margin = 1. / np.sqrt(np.sum(clf.coef_ ** 2))
+                #
+                scores.append(0.0)
 
                 # compute sample weights
                 # sample_weights = (1. - np.mean(test_labels)) * test_labels
@@ -130,13 +134,26 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
 
                 target = np.array(Rs[0] >= 0.)
 
+                # robust_target = np.array(Rs[0] >= 0.1)
+
+                mask = (np.abs(Rs[0]) >= 0.1)
+
                 assert target.shape == Rs[0].shape
 
+                # compute scores
                 ap = np.mean([average_precision_score(target, r, average="samples") for r in Rs[1:]])
+                f1 = np.mean([f1_score(target, np.array(r >= 0.), average="binary") for r in Rs[1:]])
+
+                # ap_robust = np.mean([average_precision_score(robust_target, r, average="samples") for r in Rs[1:]])
+                ap_robust = np.mean([average_precision_score(target[mask], r[mask], average="samples") for r in Rs[1:]])
+                # f1_robust = np.mean([f1_score(robust_target, np.array(r >= 0), average="binary") for r in Rs[1:]])
+                f1_robust = np.mean([f1_score(target[mask], np.array(r[mask] >= 0.), average="binary") for r in Rs[1:]])
 
                 aps.append(ap)
+                f1s.append(f1)
 
-
+                aps_robust.append(ap_robust)
+                f1s_robust.append(f1_robust)
 
         print("separability score for class {}".format(classidx))
         print(np.mean(scores))
@@ -146,8 +163,10 @@ def estimate_separability_score(data_path, data_name, dataset_name, relevance_pa
         if not os.path.exists(resultdir):
             os.makedirs(resultdir)
 
-        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(np.mean(scores)), str(np.mean(aps))]],
-                          columns=['dataset', 'model', 'layer', 'method', 'separability_score', 'sample_ap'])
+        df = pd.DataFrame([[data_name, model_name, layer_name, rule, str(np.mean(scores)),
+                            str(np.mean(aps)), str(np.mean(f1s)), str(np.mean(aps_robust)), str(np.mean(f1s_robust))]],
+                          columns=['dataset', 'model', 'layer', 'method', 'separability_score',
+                                   'ap', 'f1', 'apr', 'f1r'])
         df.to_csv("{}/{}_{}_{}.csv".format(resultdir, layer_name, rule, str(classidx)), index=False)
 
 

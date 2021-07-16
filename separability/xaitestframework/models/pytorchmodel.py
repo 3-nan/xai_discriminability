@@ -214,17 +214,19 @@ class PytorchModel(ModelInterface):
             else:
                 r_batch_dict = {}
 
-                ana = analyzer(self.model, layers)
+                for layer_name, layer in zip(layer_names, layers):
 
-                # compute relevance
-                batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+                    ana = analyzer(self.model, layer)
 
-                r_list = ana.attribute(batch_tensor, target=neuron_selection, attribute_to_layer_input=True)
-                for i, layer in enumerate(layer_names):
-                    if len(r_list[i].size()) == 4:
-                        r_batch_dict[layer] = r_list[i].detach().permute(0, 2, 3, 1).cpu().numpy()
+                    # compute relevance
+                    batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+
+                    r_batch = ana.attribute(batch_tensor, target=neuron_selection, attribute_to_layer_input=True)
+                    # for i, layer in enumerate(layer_names):
+                    if len(r_batch.size()) == 4:
+                        r_batch_dict[layer_name] = r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()
                     else:
-                        r_batch_dict[layer] = r_list[i].detach().cpu().numpy()
+                        r_batch_dict[layer_name] = r_batch.detach().cpu().numpy()
         else:
             r_batch_dict = {}
 
