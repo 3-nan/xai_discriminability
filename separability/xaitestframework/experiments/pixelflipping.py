@@ -147,14 +147,14 @@ def pixelflipping_wrapper(data_path, data_name, dataset_name, classidx, relevanc
 
     # construct explanationdir
     explanationdir = compute_relevance_path(relevance_path, data_name, model_name, layer_name, rule)
-    explanationdir = os.path.join(explanationdir, partition)
+    # explanationdir = os.path.join(explanationdir, partition)
 
     # init model
     model = init_model(model_path, model_name, framework=model_type)
 
     # load dataset for given class index
     datasetclass = get_dataset(dataset_name)
-    class_data = datasetclass(data_path, partition, classidx=[classidx])
+    class_data = datasetclass(os.path.join(data_path, data_name), partition, classidx=[classidx])
     class_data.set_mode("preprocessed")
 
     dataloader = DataLoader(class_data, batch_size=batch_size)
@@ -178,7 +178,10 @@ def compute_pixelflipping_score(dataloader, model, explanationdir, output_dir, c
 
     print("compute score for classidx {}".format(classidx))
 
-    save_examples = False
+    save_examples = True
+
+    if classidx > 4:
+        save_examples = False
 
     if save_examples:
         examples_dir = os.path.join(output_dir, "examples", rule, str(classidx), distribution)
@@ -277,6 +280,7 @@ if __name__ == "__main__":
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
     parser.add_argument("-pd", "--distribution", type=str, default="", help="Probability distribution to sample flipped pixels from (uniform, gaussian)")
     parser.add_argument("-pv", "--percentage_values", type=uncompress_percentages, help="Percentage values compressed as string value:value:value")
+    parser.add_argument("-x", "--directory", type=str, default=None, help="local_directory")
 
     ARGS = parser.parse_args()
 
@@ -288,11 +292,11 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    pixelflipping_wrapper(ARGS.data_path,
+    pixelflipping_wrapper(ARGS.directory,
                           ARGS.data_name,
                           ARGS.dataloader_name,
                           ARGS.class_label,
-                          ARGS.relevance_datapath,
+                          ARGS.directory,
                           ARGS.partition,
                           ARGS.batch_size,
                           ARGS.model_path,
@@ -301,7 +305,7 @@ if __name__ == "__main__":
                           ARGS.layer,
                           ARGS.rule,
                           ARGS.distribution,
-                          ARGS.output_dir,
+                          os.path.join(ARGS.directory, "results"),
                           ARGS.percentage_values)
 
     current, peak = tracemalloc.get_traced_memory()
@@ -309,3 +313,4 @@ if __name__ == "__main__":
     tracemalloc.stop()
     print("Duration of pixelflipping estimation:")
     print(time.process_time() - start)
+    print("Job executed successfully.")

@@ -2,12 +2,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from captum.attr import (Deconvolution, GradientAttribution, IntegratedGradients, Lime, Saliency,
+from captum.attr import (Deconvolution, GradientAttribution, NoiseTunnel, IntegratedGradients, Lime, Saliency,
                          LayerGradientXActivation,
                          LayerGradCam,
                          LayerDeepLift,
                          LayerIntegratedGradients)
-from zennit.torchvision import VGGCanonizer
+from zennit.torchvision import VGGCanonizer, ResNetCanonizer
 from zennit.rules import *
 from zennit.composites import *
 
@@ -26,6 +26,7 @@ CAPTUM_DICT = {
     # "IntegratedGradients": IntegratedGradients,
     # "GradientAttribution": GradientAttribution,
     "Deconvolution": Deconvolution,
+    "SmoothGrad": Saliency,
     # "Lime": Lime,
     "GradientXActivation": LayerGradientXActivation,
     "GradCam": LayerGradCam,
@@ -59,7 +60,17 @@ def get_zennit_composite(xai_method, model, shape=None):
         composite_kwargs['high'] = torch.ones(*shape, device=model.device)
 
     # use torchvision specific canonizers, as supplied in the MODELS dict
-    composite_kwargs['canonizers'] = [VGGCanonizer()]  # [MODELS[model_name][1]()]
+    if model.name == "vgg16":
+        composite_kwargs['canonizers'] = [VGGCanonizer()]  # [MODELS[model_name][1]()]
+    elif model.name == "vgg16bn":
+        composite_kwargs['canonizers'] = [VGGCanonizer()]
+        # print("no canonizer")
+    elif model.name == "resnet18":
+        # composite_kwargs['canonizers'] = [ResNetCanonizer()]
+        # composite_kwargs['canonizers'] = []
+        print("no canonizer")
+    else:
+        raise ValueError("Model name not known")
 
     # create a composite specified by a name; the COMPOSITES dict includes all preset composites
     # provided by zennit.
@@ -70,15 +81,18 @@ def get_zennit_composite(xai_method, model, shape=None):
     return composite
 
 
-def hook(module, input, output):
-    module.input = input[0]
-    module.input.retain_grad()
+def hook(module, input):
+    module.saved_input = input[0]
+    module.saved_input.retain_grad()
+    module.saved_input.requires_grad_()
 
 
-def get_pytorch_model(modelname):
+def get_pytorch_model(modelname, num_classes):
 
     modeldict = {
         "vgg16": models.vgg16,
+        "vgg16bn": models.vgg16_bn,
+        "resnet18": models.resnet18,
         "densenet161": models.densenet161,
         "inception": models.inception_v3
     }
@@ -86,7 +100,12 @@ def get_pytorch_model(modelname):
     model = modeldict[modelname]()
 
     # adapt last layer
-    model.classifier[-1] = nn.Linear(4096, 20)
+    if modelname == "vgg16" or modelname == "vgg16bn":
+        model.classifier[-1] = nn.Linear(4096, num_classes)      # TODO change num_classes
+    elif modelname == "resnet18":
+        model.fc = nn.Linear(512, num_classes)
+    else:
+        raise ValueError("please specify get pytorch model")
 
     return model
 
@@ -98,14 +117,14 @@ class PytorchModel(ModelInterface):
         # set device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+        # HARD CODED
+        self.num_classes = 1000  # 1000     # 20  # 1000
+
         # init
-        self.model = get_pytorch_model(modelname)
+        self.model = get_pytorch_model(modelname, self.num_classes)
         self.model.to(self.device)
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
         self.model.eval()
-
-        # HARD CODED
-        self.num_classes = 20
 
         # build layer name dictionary
         conv_counter = 1
@@ -206,9 +225,16 @@ class PytorchModel(ModelInterface):
             if xai_method not in CAPTUM_LAYERWISE:
                 ana = analyzer(self.model)
 
+                if xai_method == "SmoothGrad":
+                    ana = NoiseTunnel(ana)
+
                 # compute relevance
                 batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
-                r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
+
+                if xai_method == "SmoothGrad":
+                    r_batch = ana.attribute(batch_tensor, target=neuron_selection, nt_samples=20)
+                else:
+                    r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
                 # explained_layer_names=layer_names)
                 r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()}
             else:
@@ -228,6 +254,10 @@ class PytorchModel(ModelInterface):
                     else:
                         r_batch_dict[layer_name] = r_batch.detach().cpu().numpy()
         else:
+
+            # get handles for chosen layers
+            handles = [layer.register_forward_pre_hook(hook) for layer in layers]
+
             r_batch_dict = {}
 
             # Zennit attribution computation
@@ -240,9 +270,6 @@ class PytorchModel(ModelInterface):
 
             with composite.context(self.model) as modified:
 
-                # get handles for chosen layers
-                handles = [layer.register_forward_hook(hook) for layer in layers]
-
                 batch_tensor.requires_grad_()
 
                 out = modified(batch_tensor)
@@ -254,7 +281,7 @@ class PytorchModel(ModelInterface):
                     handle.remove()
 
             for i, name in enumerate(layer_names):
-                r_batch = layers[i].input.grad
+                r_batch = layers[i].saved_input.grad
 
                 shape = list(r_batch.size())
 

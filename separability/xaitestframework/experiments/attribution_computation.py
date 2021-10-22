@@ -11,25 +11,6 @@ from ..helpers.model_helper import init_model
 from ..helpers.universal_helper import extract_filename
 
 
-def combine_path(output_dir, attributes):
-    """ Computes directory path to save computed relevance to. """
-
-    # remove backslash at the end
-    if output_dir[-1] == "/":
-        output_dir = output_dir[:-1]
-
-    for attr in attributes:
-
-        if not os.path.exists(output_dir + "/" + attr):
-            try:
-                os.makedirs(output_dir + "/" + attr)
-            except FileExistsError:
-                pass
-        output_dir = output_dir + "/" + attr
-
-    return output_dir
-
-
 def compute_attribution_wrapper(data_path, data_name, dataset_name, partition, batch_size, model_path, model_name, model_type, layer_names, xai_method, class_name, output_dir, startidx=0, endidx=0):
     """ Wrapper Function to compute the attributed relevances for the selected class. """
 
@@ -43,10 +24,15 @@ def compute_attribution_wrapper(data_path, data_name, dataset_name, partition, b
 
     # initialize dataset
     dataset = get_dataset(dataset_name)
-    dataset = dataset(data_path, partition)
+    print("Loading dataset {} from {}".format(data_name, data_path))
+    dataset = dataset(os.path.join(data_path, data_name), partition, classidx=[class_name])
+    print("Data loaded.")
 
     # compute/create output dir
-    output_dir = combine_path(output_dir, [data_name, model_name])
+    # output_dir = os.path.join(output_dir, data_name, model_name)
+    # os.makedirs(output_dir, exist_ok=True)
+    output_dir = os.path.join(data_path, "results", "{}_{}".format(data_name, model_name))
+    os.makedirs(output_dir, exist_ok=True)
 
     compute_attributions_for_class(dataset, partition, batch_size, model, layer_names,
                                    xai_method, class_name, output_dir, startidx=startidx, endidx=endidx)
@@ -72,7 +58,9 @@ def compute_attributions_for_class(dataset, partition, batch_size, model, layer_
         R = model.compute_relevance(data, layer_names, class_name, xai_method, additional_parameter=None)       # TODO: add additional parameter to pipeline
 
         for layer_name in layer_names:
-            layer_output_dir = combine_path(output_dir, [layer_name, xai_method, partition, str(class_name)])
+            layer_output_dir = os.path.join(output_dir, xai_method, layer_name, str(class_name))
+            os.makedirs(layer_output_dir, exist_ok=True)
+            # layer_output_dir = combine_path(output_dir, [layer_name, xai_method, partition, str(class_name)])
             for r, relevance in enumerate(R[layer_name]):
                 fname = extract_filename(batch[r].filename)
                 filename = os.path.join(layer_output_dir, fname + ".npy")
@@ -109,6 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
     parser.add_argument("-l", "--layer_names", type=decode_layernames, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    parser.add_argument("-x", "--directory", type=str, default=None, help="local_directory")
 
     ARGS = parser.parse_args()
 
@@ -120,7 +109,7 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    compute_attribution_wrapper(ARGS.data_path,
+    compute_attribution_wrapper(ARGS.directory,
                                 ARGS.data_name,
                                 ARGS.dataset_name,
                                 ARGS.partition,

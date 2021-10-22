@@ -48,7 +48,21 @@ def hog_distance(explanation, original_explanation):
     else:
         hog_original = hog(original_explanation[:, :, np.newaxis])
         hog_new = hog(explanation[:, :, np.newaxis])
-    return pearsonr(hog_original, hog_new)[0]
+
+    if np.isnan(hog_original).any():
+        print("nan value hog original")
+        return 0.
+    elif np.isnan(hog_new).any():
+        print("nan value hog new")
+        return 0.
+    elif np.isinf(hog_original).any():
+        print("Inf value hog original")
+        return 0.
+    elif np.isinf(hog_new).any():
+        print("Inf value hog new")
+        return 0.
+    else:
+        return pearsonr(hog_original, hog_new)[0]
 
 
 DISTANCES = {
@@ -68,6 +82,9 @@ def layer_randomization(model, dataloader, classidx, xai_method, input_layer, ex
                         top_down=True, independent=False, distances=None):
 
     save_examples = True
+
+    if classidx > 200:      # > 4:
+        save_examples = False
 
     if not distances:
         distances = ["cosine"]
@@ -117,7 +134,7 @@ def layer_randomization(model, dataloader, classidx, xai_method, input_layer, ex
                 # np.save(join_path(output_dir, extract_filename(batch[i].filename)) + ".npy", explanation) # ToDo: save some explanations for visual inspection
 
                 # compute similarity
-                original_explanation = np.load(os.path.join(explanationdir, "val", str(classidx), extract_filename(batch[i].filename)) + ".npy")
+                original_explanation = np.load(os.path.join(explanationdir, str(classidx), extract_filename(batch[i].filename)) + ".npy")
 
                 # check shapes
                 assert(original_explanation.shape == explanation.shape)
@@ -170,7 +187,8 @@ def save_model_param_randomization_results(data_name, model_name, xai_method, cl
 
 def model_parameter_randomization(data_path, data_name, dataset_name, classidx, partition, batch_size,
                                   model_path, model_name, model_type,
-                                  layer_names, xai_method, explanationdir, output_dir, maxidx=None, distances=None):
+                                  layer_names, xai_method, explanationdir, output_dir, maxidx=None, distances=None,
+                                  setting="top_down"):
     """ Function to create explanations on randomized models. """
 
     # set bottom layer
@@ -186,19 +204,15 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     # init model
     model = init_model(model_path, model_name, framework=model_type)
 
-    explanationdir = compute_relevance_path(explanationdir, data_name, model_name, input_layer, xai_method)
+    print("Evaluation for {}".format(xai_method))
 
-    # configure directories
-    if not os.path.exists(os.path.join(output_dir, "cascading_top_down")):
-        os.makedirs(os.path.join(output_dir, "cascading_top_down"))
-        os.makedirs(os.path.join(output_dir, "cascading_bottom_up"))
-        os.makedirs(os.path.join(output_dir, "independent"))
+    explanationdir = compute_relevance_path(explanationdir, data_name, model_name, input_layer, xai_method)
 
     print("iteration for class index {}".format(classidx))
 
     # initialize dataset
     datasetclass = get_dataset(dataset_name)
-    class_data = datasetclass(data_path, partition, classidx=[classidx])
+    class_data = datasetclass(os.path.join(data_path, data_name), partition, classidx=[classidx])
     class_data.set_mode("preprocessed")
 
     print(type(class_data))
@@ -208,32 +222,40 @@ def model_parameter_randomization(data_path, data_name, dataset_name, classidx, 
     else:
         dataloader = DataLoader(class_data, batch_size=batch_size)
 
-    # CASE 1: cascading layer randomization top-down
-    print("case 1: cascading layer randomization top-down")
-    case_output_dir = os.path.join(output_dir, "cascading_top_down")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
-                                        explanationdir, case_output_dir, top_down=True, distances=distances)
-    # save results
-    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                           case_output_dir)
+    if setting == "top_down":
+        # CASE 1: cascading layer randomization top-down
+        print("case 1: cascading layer randomization top-down")
+        case_output_dir = os.path.join(output_dir, "cascading_top_down")
+        os.makedirs(case_output_dir, exist_ok=True)
+        class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
+                                            explanationdir, case_output_dir, top_down=True, distances=distances)
+        # save results
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
 
-    # CASE 2: cascading layer randomization bottom-up
-    print("case 2: cascading layer randomization bottom-up")
-    case_output_dir = os.path.join(output_dir, "cascading_bottom_up")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
-                                        explanationdir, case_output_dir, top_down=False, distances=distances)
-    # save results
-    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                           case_output_dir)
+    elif setting == "bottom_up":
+        # CASE 2: cascading layer randomization bottom-up
+        print("case 2: cascading layer randomization bottom-up")
+        case_output_dir = os.path.join(output_dir, "cascading_bottom_up")
+        os.makedirs(case_output_dir, exist_ok=True)
+        class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer,
+                                            explanationdir, case_output_dir, top_down=False, distances=distances)
+        # save results
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
 
-    # CASE 3: independent layer randomization
-    print("case 3: independent layer randomization")
-    case_output_dir = os.path.join(output_dir, "independent")
-    class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer, explanationdir,
-                                        case_output_dir, top_down=False, independent=True, distances=distances)
-    # save results
-    save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
-                                           case_output_dir)
+    elif setting == "independent":
+        # CASE 3: independent layer randomization
+        print("case 3: independent layer randomization")
+        case_output_dir = os.path.join(output_dir, "independent")
+        os.makedirs(case_output_dir, exist_ok=True)
+        class_results = layer_randomization(model, dataloader, classidx, xai_method, input_layer, explanationdir,
+                                            case_output_dir, top_down=False, independent=True, distances=distances)
+        # save results
+        save_model_param_randomization_results(data_name, model_name, xai_method, classidx, class_results,
+                                               case_output_dir)
+    else:
+        raise ValueError("setting {} not known.".format(setting))
 
 
 if __name__ == "__main__":
@@ -263,6 +285,8 @@ if __name__ == "__main__":
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
     parser.add_argument("-mi", "--max_idx", type=int, default=None, help="Max class index to compute values for")
     parser.add_argument("-dm", "--distance_measure", type=decode_list, default=None, help="Distance measure to compute between explanations.")
+    parser.add_argument("-s", "--setting", type=str, default="top_down", help="Order of layers / independent handling.")
+    parser.add_argument("-x", "--directory", type=str, default=None, help="local_directory")
 
     ARGS = parser.parse_args()
 
@@ -274,7 +298,7 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    model_parameter_randomization(ARGS.data_path,
+    model_parameter_randomization(ARGS.directory,
                                   ARGS.data_name,
                                   ARGS.dataset_name,
                                   ARGS.class_label,
@@ -285,10 +309,11 @@ if __name__ == "__main__":
                                   ARGS.model_type,
                                   ARGS.layer,
                                   ARGS.rule,
-                                  ARGS.relevance_datapath,
-                                  ARGS.output_dir,
+                                  ARGS.directory,
+                                  os.path.join(ARGS.directory, "results"),
                                   maxidx=ARGS.max_idx,
-                                  distances=ARGS.distance_measure
+                                  distances=ARGS.distance_measure,
+                                  setting=ARGS.setting
                                   )
 
     current, peak = tracemalloc.get_traced_memory()

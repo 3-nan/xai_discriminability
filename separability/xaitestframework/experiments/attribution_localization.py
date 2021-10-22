@@ -14,7 +14,7 @@ def get_explanation(relevance_path, data_name, model_name, layer, xai_method, fi
     """ Load explanation for given filename and label. """
     filename = extract_filename(filename)
     explanation_dir = compute_relevance_path(relevance_path, data_name, model_name, layer, xai_method)
-    fname = os.path.join(explanation_dir, "val", str(label), filename)
+    fname = os.path.join(explanation_dir, str(label), filename)
 
     explanation = np.load(fname + ".npy")
     return explanation
@@ -31,7 +31,7 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
 
     # initialize dataset and dataloader
     dataset = get_dataset(dataset_name)
-    dataset = dataset(data_path, "val")
+    dataset = dataset(os.path.join(data_path, data_name), "val")
     dataset.set_mode("binary_mask")
 
     dataloader = DataLoader(dataset, batch_size=batch_size)
@@ -51,7 +51,12 @@ def attribution_localization(data_path, data_name, dataset_name, relevance_path,
             sample_score_u50 = []
             sample_score_u25 = []
 
-            for label in sample.label:
+            labels = sample.label
+
+            if isinstance(labels, str):
+                labels = [labels]
+
+            for label in labels:
                 # get attribution according to label
                 explanation = get_explanation(relevance_path, data_name, model_name, input_layer, xai_method, sample.filename, dataset.classname_to_idx(label))
                 binary_mask = sample.binary_mask[label]
@@ -141,6 +146,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--rule", type=str, default="LRPSequentialCompositeA", help="Rule to be used to compute relevance maps")
     parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
+    parser.add_argument("-x", "--directory", type=str, default=None, help="local_directory")
 
     ARGS = parser.parse_args()
 
@@ -152,19 +158,20 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    attribution_localization(ARGS.data_path,
+    attribution_localization(ARGS.directory,
                              ARGS.data_name,
                              ARGS.dataset_name,
-                             ARGS.relevance_datapath,
+                             ARGS.directory,
                              ARGS.partition,
                              ARGS.batch_size,
                              ARGS.model_name,
                              ARGS.layer,
                              ARGS.rule,
-                             ARGS.output_dir)
+                             os.path.join(ARGS.directory, "results"))
     
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10**6}MB; Peak was {peak / 10**6}MB")
     tracemalloc.stop()
     print("Duration of attribution localization score estimation:")
     print(time.process_time() - start)
+    print("Job executed successfully.")

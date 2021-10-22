@@ -24,6 +24,6 @@ def join_path(path, dirs):
 def compute_relevance_path(relevance_path, data_name, model_name, layer, rule):
     """ Compute path, where relevance maps are stored. """
 
-    relevance_path = join_path(relevance_path, [data_name, model_name, layer, rule])
+    relevance_path = os.path.join(relevance_path, "{}_{}".format(data_name, model_name), rule, layer)
 
     return relevance_path

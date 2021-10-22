@@ -1,3 +1,4 @@
+import os
 import yaml
 import numpy as np
 import pandas as pd
@@ -8,53 +9,37 @@ import matplotlib.pyplot as plt
 
 filepath = "configs/config_experiments.yaml"
 
+# dataname = "VOC2012"
+# modelname = "vgg16"
+dataname = "imagenet"
+# modelname = "vgg16bn"
+# modelname = "vgg16bn_uncanonized"
+modelname = "resnet18_uncanonized"
+
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
     resultdir = "../results/separability"
 
-    resultdir = resultdir + "/" + configs["data"]["dataname"] + "_" + configs["model"]["modelname"]
+    resultdir = resultdir + "/" + dataname + "_" + modelname
 
     layers = configs["layers"]
 
-    classindices = range(20)
+    if dataname == "VOC2012":
+        classindices = range(20)
+    elif dataname == "imagenet":
+        classindices = [96, 126, 155, 292, 301, 347, 387, 405, 417, 426,
+                        446, 546, 565, 573, 604, 758, 844, 890, 937, 954]
+    else:
+        print("please specify classindices for dataname {}!".format(dataname))
+
     print(layers)
 
-    layer = layers[0]
-
-    print(layer)
+    # layer = layers[0]
+    #
+    # print(layer)
 
     method_scores = []
-
-    # plt.figure()
-    #
-    # for xai_method in configs["xai_methods"]:
-    #     print(xai_method)
-    #     scores = []
-    #     for classidx in classindices:
-    #         csv = pd.read_csv(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv")
-    #         # print(float(csv["separability_score"]))
-    #         scores.append(float(csv["separability_score"]))
-    #
-    #     method_scores.append(np.mean(scores))
-    #
-    #     plt.plot(range(20), scores)
-    #
-    # plt.xlabel("class_label")
-    # plt.ylabel("separability score")
-    # plt.legend(configs["xai_methods"])
-    # plt.show()
-
-    # plt.figure()
-    # plt.bar(configs["xai_methods"], method_scores)
-    # plt.xlabel("xai method")
-    # plt.ylabel("separability score [mean over classes]")
-    # plt.xticks(rotation="45", ha="right")
-    # plt.show()
-
-    # plt.figure()
-
-    # fig, ax = plt.subplots()
 
     x = np.arange(len(layers))
     n_classes = len(classindices)
@@ -105,11 +90,15 @@ with open(filepath) as file:
             for c, classidx in enumerate(classindices):
 
                 try:
-                    csv = pd.read_csv(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv")
-                    layer_scores.append(float(csv["ap"]))
+                    csv = pd.read_csv(os.path.join(resultdir, layer + "_" + xai_method + "_" + str(classidx) + ".csv"))
+                    score = float(csv["ap"])
+                    if not np.isnan(score):
+                        layer_scores.append(float(csv["ap"]))
+                    else:
+                        print("Warning: NaN value for method {} layer {} class {}".format(xai_method, layer, classidx))
                 except FileNotFoundError:
                     print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
-                    layer_scores.append(0.)
+                    layer_scores.append(1.)
 
                 # print(float(csv["separability_score"]))
 
@@ -117,12 +106,16 @@ with open(filepath) as file:
 
         plt.plot(layers, scores)
 
-    plt.xlabel("xai method")
+    plt.xlabel("XAI method")
     plt.ylabel("class-wise mean of separability scores")
-    plt.title("ap")
+    plt.ylim([0.375, 1.025])
+    plt.title("Average Precision")
     plt.legend(configs["xai_methods"])
-    plt.show()
+    # plt.show()
+    plt.savefig("../results/separability/figures/{}_{}/ap_all.svg".format(dataname, modelname), format="svg")
+    plt.close()
 
+    # raise ValueError()
     plt.figure()
 
     for m, xai_method in enumerate(configs["xai_methods"]):
@@ -136,22 +129,28 @@ with open(filepath) as file:
 
                 try:
                     csv = pd.read_csv(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv")
-                    layer_scores.append(float(csv["apr"]))
+                    score = float(csv["apr"])
+                    if not np.isnan(score):
+                        layer_scores.append(score)
+                    else:
+                        print("Warning: NaN value for method {} layer {} class {}".format(xai_method, layer, classidx))
+
                 except FileNotFoundError:
                     print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
-                    layer_scores.append(0.)
-
-                # print(float(csv["separability_score"]))
+                    layer_scores.append(1.)
 
             scores.append(np.mean(layer_scores))
 
         plt.plot(layers, scores)
 
-    plt.xlabel("xai method")
+    plt.xlabel("XAI method")
     plt.ylabel("class-wise mean of separability scores")
-    plt.title("ap with true on >= 0.1")
+    plt.ylim([0.375, 1.025])
+    plt.title("Average Precision with theta = 0.1")
     plt.legend(configs["xai_methods"])
-    plt.show()
+    # plt.show()
+    plt.savefig("../results/separability/figures/{}_{}/ap_filtered_all.svg".format(dataname, modelname), format="svg")
+    plt.close()
 
     plt.figure()
 
@@ -169,7 +168,7 @@ with open(filepath) as file:
                     layer_scores.append(float(csv["f1"]))
                 except FileNotFoundError:
                     print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
-                    layer_scores.append(0.)
+                    layer_scores.append(1.)
 
                 # print(float(csv["separability_score"]))
 
@@ -177,11 +176,14 @@ with open(filepath) as file:
 
         plt.plot(layers, scores)
 
-    plt.xlabel("xai method")
+    plt.xlabel("XAI method")
     plt.ylabel("class-wise mean of separability scores")
-    plt.title("f1")
+    plt.ylim([-0.025, 1.025])
+    plt.title("F1 Score")
     plt.legend(configs["xai_methods"])
-    plt.show()
+    # plt.show()
+    plt.savefig("../results/separability/figures/{}_{}/f1_all.svg".format(dataname, modelname), format="svg")
+    plt.close()
 
     plt.figure()
 
@@ -199,7 +201,7 @@ with open(filepath) as file:
                     layer_scores.append(float(csv["f1r"]))
                 except FileNotFoundError:
                     print(resultdir + "/" + layer + "_" + xai_method + "_" + str(classidx) + ".csv not found")
-                    layer_scores.append(0.)
+                    layer_scores.append(1.)
 
                 # print(float(csv["separability_score"]))
 
@@ -207,8 +209,11 @@ with open(filepath) as file:
 
         plt.plot(layers, scores)
 
-    plt.xlabel("xai method")
+    plt.xlabel("XAI method")
     plt.ylabel("class-wise mean of separability scores")
-    plt.title("f1 with true at >= 0.1")
+    plt.ylim([-0.025, 1.025])
+    plt.title("F1 Score with theta = 0.1")
     plt.legend(configs["xai_methods"])
-    plt.show()
+    # plt.show()
+    plt.savefig("../results/separability/figures/{}_{}/f1_filtered_all.svg".format(dataname, modelname), format="svg")
+    plt.close()

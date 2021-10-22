@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import time
 import yaml
 import subprocess
 
@@ -8,7 +9,7 @@ from xaitestframework.experiments.attribution_computation import compute_attribu
 from xaitestframework.dataloading.custom import get_dataset
 
 
-def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
+def submit_on_sungrid(args, configs, jobconfig, quantification_method, index, with_attr=None):
     """ Submit the specified job on a sungrid engine. """
 
     print('Generating and submitting jobs for:')
@@ -16,12 +17,42 @@ def submit_on_sungrid(args, configs, jobconfig, quantification_method, index):
 
     # generate script
     execthis = ['#!/bin/bash']
-    execthis = ['hostname']
+    execthis += ['hostname']
+    execthis += ['mkdir -p /data/local/users/motzkus']
+    execthis += ['mkdir /data/local/users/motzkus/$JOB_ID']
+
+    execthis += ['cp /data/cluster/users/motzkus/data/{}.tar.xz /data/local/users/motzkus/$JOB_ID/'.format(configs["data"]["dataname"])]
+    execthis += ['tar -xf /data/local/users/motzkus/$JOB_ID/{}.tar.xz -C /data/local/users/motzkus/$JOB_ID/'.format(configs["data"]["dataname"])]
+
+    if with_attr:
+        xai_method, layer, classidx = with_attr
+        if classidx:
+            execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer, classidx)]
+        else:
+            execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer)]
+
+        execthis += ['cp /data/cluster/users/motzkus/data_$JOB_ID.tar.gz /data/local/users/motzkus/$JOB_ID/']
+        execthis += ['tar -xf /data/local/users/motzkus/$JOB_ID/data_$JOB_ID.tar.gz -C /data/local/users/motzkus/$JOB_ID/']
+        execthis += ['rm /data/cluster/users/motzkus/data_$JOB_ID.tar.gz']
+
+    execthis += ['mkdir /data/local/users/motzkus/$JOB_ID/results']
     execthis += ['source /home/fe/motzkus/.bashrc']  # enables conda for bash ToDo: change dir
-    # execthis += ['cd {}/experiments'.format(HERE)]  # go to python root
     execthis += ['{} activate {}'.format(configs['system_config']['conda'], configs['system_config']['environment'])]
-    execthis += ['python3 -m xaitestframework.experiments.{} {}'.format(quantification_method, args)]
+    execthis += ['python3 -m xaitestframework.experiments.{} {} -x /data/local/users/motzkus/$JOB_ID'.format(quantification_method, args)]
     execthis += ['{} deactivate'.format(configs['system_config']['conda'])]  # leave venv
+    execthis += ['tar -zcf /data/local/users/motzkus/$JOB_ID/results_$JOB_ID.tar.gz -C /data/local/users/motzkus/$JOB_ID/results .']
+
+    if with_attr:
+        execthis += ['cp /data/local/users/motzkus/$JOB_ID/results_$JOB_ID.tar.gz /data/cluster/users/motzkus/results/']
+        execthis += [
+            'tar -xf /data/cluster/users/motzkus/results/results_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/' + quantification_method]
+
+    else:
+        execthis += ['cp /data/local/users/motzkus/$JOB_ID/results_$JOB_ID.tar.gz /data/cluster/users/motzkus/results/']
+        execthis += ['tar -xf /data/cluster/users/motzkus/results/results_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/']
+
+    execthis += ['rm /data/cluster/users/motzkus/results/results_$JOB_ID.tar.gz']
+    execthis += ['rm -r /data/local/users/motzkus/$JOB_ID']
     execthis = '\n'.join(execthis)
 
     JOBNAME = '[{}]_of_"{}"'.format(index + 1, quantification_method)
@@ -137,8 +168,8 @@ def evaluate(filepath):
         base_args += " -mn " + modelname
         base_args += " -mt " + modeltype
 
-        dataset = get_dataset(dataset)
-        dataset = dataset(datapath, partition)
+        dataset_class = get_dataset(dataset)
+        dataset = dataset_class(datapath, partition)
         print(len(dataset))
 
         if classes[0] == "all":
@@ -147,28 +178,31 @@ def evaluate(filepath):
         # add quantification specific arguments
         if list(quantifications[0].keys())[0] == "attribution_computation":
 
-            job_size = 1000  # number of images to process per job
+            job_size = 500   # 1000  # number of images to process per job
             job_index = 0
 
-            for xai_method in xai_methods:
-                print(xai_method)
-                for label in classes:
-                    print(label)
-                    label_idx = dataset.classname_to_idx(label)
+            for label in classes:
+                print(label)
+                label_idx = dataset.classname_to_idx(label)
+
+                class_dataset = dataset_class(datapath, partition, classidx=[label_idx])
+
+                for xai_method in xai_methods:
+                    print(xai_method)
 
                     args = base_args + " -cl " + str(label_idx)
                     args = args + " -r " + xai_method
                     args = args + " -l " + ":".join(layers)
 
                     if backend == "sge":
-                        for i in range(math.ceil(len(dataset) / job_size)):
+                        for i in range(math.ceil(len(class_dataset) / job_size)):
                             job_args = args + " -si " + str(i * job_size) + " -ei " + str((i + 1) * job_size)
 
                             submit_on_sungrid(job_args,
                                               configs,
                                               quantifications[0]["attribution_computation"]["config"],
                                               "attribution_computation",
-                                              job_index)       # ToDo
+                                              job_index)
                             job_index += 1
 
                     elif backend == "ubuntu":
@@ -198,7 +232,7 @@ def evaluate(filepath):
                 for xai_method in xai_methods:
                     xai_args = method_args + " -r " + xai_method
 
-                    if quantification in ["model_parameter_randomization", "pixelflipping", "manifold_outlier_pixelflipping_experiment", "activation_eval"]:
+                    if quantification in ["model_parameter_randomization", "pixelflipping", "separability", "manifold_outlier_pixelflipping_experiment", "activation_eval"]:
 
                         for name in classes:
                             idx = dataset.classname_to_idx(name)
@@ -213,6 +247,25 @@ def evaluate(filepath):
                                 percentages = ":".join([str(p) for p in quantification_dict[quantification]["args"]["percentages"]])
                                 job_args = job_args + " -pv " + percentages
 
+                                # submit
+                                if backend == "sge":
+                                    submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
+                                                      quantification, job_index,
+                                                      with_attr=(xai_method, layers[0], idx))
+                                    job_index += 1
+
+                            elif quantification == "separability":
+
+                                for layer in layers:
+                                    job_args_layer = job_args + " -l {}".format(layer)
+
+                                    submit_on_sungrid(job_args_layer, configs,
+                                                      quantification_dict[quantification]["config"],
+                                                      quantification, job_index,
+                                                      with_attr=(xai_method, layer, str(idx)))
+                                    job_index += 1
+                                    time.sleep(3)
+
                             elif quantification == "activation_eval":
 
                                 job_args = job_args + " -pd " + quantification_dict[quantification]["args"]["distribution"]
@@ -221,8 +274,10 @@ def evaluate(filepath):
 
                                 for layer in layers:
                                     job_args_2 = job_args + " -l " + layer
+
                                     submit_on_sungrid(job_args_2, configs, quantification_dict[quantification]["config"],
-                                                      quantification, job_index)
+                                                      quantification, job_index,
+                                                      with_attr=(xai_method, layer, str(idx)))
                                     job_index += 1
 
                             elif quantification == "model_parameter_randomization":
@@ -232,12 +287,14 @@ def evaluate(filepath):
                                     job_args = job_args + " -mi " + str(quantification_dict[quantification]["args"]["max_index"])
                                 if quantification_dict[quantification]["args"]["distance_measures"]:
                                     job_args = job_args + " -dm " + ":".join(quantification_dict[quantification]["args"]["distance_measures"])
+                                job_args = job_args + " -s {}".format(quantification_dict[quantification]["args"]["setting"])
 
-                            # submit
-                            if backend == "sge" and quantification != "activation_eval":
-                                submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
-                                                  quantification, job_index)
-                                job_index += 1
+                                # submit
+                                if backend == "sge":
+                                    submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
+                                                      quantification, job_index,
+                                                      with_attr=(xai_method, layers[0], idx))
+                                    job_index += 1
 
                     else:
                         for layer in layers:
@@ -255,7 +312,8 @@ def evaluate(filepath):
 
                             if backend == "sge":
                                 submit_on_sungrid(job_args, configs, quantification_dict[quantification]["config"],
-                                                  quantification, job_index)
+                                                  quantification, job_index,
+                                                  with_attr=(xai_method, layer, None))
                                 job_index += 1
 
 

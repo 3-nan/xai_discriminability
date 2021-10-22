@@ -15,7 +15,7 @@ def get_explanation(relevance_path, data_name, model_name, layer, xai_method, fi
     """ Load explanation for given filename and label. """
     filename = extract_filename(filename)
     explanation_dir = compute_relevance_path(relevance_path, data_name, model_name, layer, xai_method)
-    fname = os.path.join(explanation_dir, "val", str(label), filename)
+    fname = os.path.join(explanation_dir, str(label), filename)
 
     explanation = np.load(fname + ".npy")
 
@@ -28,6 +28,8 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
                                  layer_names, xai_method, output_dir, gaussian_blur=True):
     """ Computes the pointing game score score. """
 
+    print("Gaussian Blur: {}".format(gaussian_blur))
+    
     if isinstance(layer_names, list):
         input_layer = layer_names[0]
     else:
@@ -38,12 +40,15 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
     scores_u25 = {}
 
     # initialize dataset
+    print("Loading data from {}, with partition {}".format(os.path.join(data_path, data_name), partition))
     datasetclass = get_dataset(dataset_name)
-    dataset = datasetclass(data_path, partition)
+    dataset = datasetclass(os.path.join(data_path, data_name), partition)
     dataset.set_mode("raw")
 
     # iterate classes
     for label in dataset.classes:
+
+        print("Start estimation for label {}".format(label))
 
         classidx = str(dataset.classname_to_idx(label))
 
@@ -53,8 +58,9 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
         class_score_u25 = []
 
         # initialize class dataset
-        class_data = datasetclass(data_path, "val", classidx=[classidx])
+        class_data = datasetclass(os.path.join(data_path, data_name), "val", classidx=[classidx])
         class_data.set_mode("binary_mask")
+        print("Dataset loaded.")
 
         dataloader = DataLoader(class_data, batch_size=batch_size)
 
@@ -86,14 +92,17 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
                 else:
                     is_in = binary_mask[maxindex[0], maxindex[1]]
 
+                if type(is_in) != int:
+                    is_in = int(is_in)
+
                 class_score += is_in
                 if ratio < 0.5:
                     class_score_u50.append(is_in)
                     if ratio < 0.25:
                         class_score_u25.append(is_in)
 
-        print(class_score)
-        print(len(class_data))
+        print("Class score: {}".format(class_score))
+        print("Class length: {}".format(len(class_data)))
         scores[classidx] = float(class_score) / len(class_data)
         scores_u50[classidx] = np.mean(class_score_u50) if class_score_u50 else None
         scores_u25[classidx] = np.mean(class_score_u25) if class_score_u25 else None
@@ -106,10 +115,19 @@ def estimate_pointing_game_score(data_path, data_name, dataset_name, relevance_p
 
     df = pd.DataFrame(results,
                       columns=['dataset', 'model', 'method', 'classidx', 'score', 'score_u50', 'score_u25'])
-    df.to_csv(os.path.join(output_dir, "{}_{}_{}.csv".format(data_name, model_name, xai_method)), index=False)
+    if gaussian_blur:
+        df.to_csv(os.path.join(output_dir, "{}_{}_{}_blur.csv".format(data_name, model_name, xai_method)), index=False)
+    else:
+        df.to_csv(os.path.join(output_dir, "{}_{}_{}.csv".format(data_name, model_name, xai_method)), index=False)
+
+    return None
 
 
 if __name__ == "__main__":
+
+    def bool_is_true(input):
+        return input == "True"
+
     # Setting up an argument parser for command line calls
     parser = argparse.ArgumentParser(description="Test and evaluate multiple xai methods")
 
@@ -132,7 +150,8 @@ if __name__ == "__main__":
                         help="Rule to be used to compute relevance maps")
     parser.add_argument("-l", "--layer", type=str, default=None, help="Layer to compute relevance maps for")
     parser.add_argument("-bs", "--batch_size", type=int, default=50, help="Batch size for relevance map computation")
-    parser.add_argument("-gb", "--gaussian_blur", type=bool, default=True, help="Boolean indicating if gaussian blur should be applied to attribution")
+    parser.add_argument("-gb", "--gaussian_blur", type=bool_is_true, default=True, help="Boolean indicating if gaussian blur should be applied to attribution")
+    parser.add_argument("-x", "--directory", type=str, default=None, help="local_directory")
 
     ARGS = parser.parse_args()
 
@@ -144,16 +163,16 @@ if __name__ == "__main__":
     start = time.process_time()
     tracemalloc.start()
 
-    estimate_pointing_game_score(ARGS.data_path,
+    estimate_pointing_game_score(ARGS.directory,
                                  ARGS.data_name,
                                  ARGS.dataset_name,
-                                 ARGS.relevance_datapath,
+                                 ARGS.directory,
                                  ARGS.partition,
                                  ARGS.batch_size,
                                  ARGS.model_name,
                                  ARGS.layer,
                                  ARGS.rule,
-                                 ARGS.output_dir,
+                                 os.path.join(ARGS.directory, "results"),
                                  gaussian_blur=ARGS.gaussian_blur)
 
     current, peak = tracemalloc.get_traced_memory()
@@ -161,3 +180,4 @@ if __name__ == "__main__":
     tracemalloc.stop()
     print("Duration of pointing game score estimation:")
     print(time.process_time() - start)
+    print("Job executed successfully.")

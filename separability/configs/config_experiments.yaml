@@ -14,8 +14,8 @@ data:
   batchsize: 50
 
 model:
-  modelpath: /data/cluster/users/motzkus/models/resnet18_imagenet/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
-  modelname: resnet18     #vgg16      # resnet18    #vgg16bn
+  modelpath: /data/cluster/users/motzkus/models/vgg16bn_imagenet/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
+  modelname: vgg16bn     #vgg16      # resnet18    #vgg16bn
   modeltype: pytorch
 
 dirs:
@@ -70,9 +70,9 @@ xai_methods:
   - epsilon_gamma_box
   - epsilon_plus
 #  - epsilon_plus_flat
-#  - epsilon_alpha2_beta1
+  - epsilon_alpha2_beta1
 #  - epsilon_alpha2_beta1_flat
-#  - alpha2_beta1
+  - alpha2_beta1
 #  - alpha2_beta1_flat
 
 classes:
@@ -126,22 +126,22 @@ quantifications:
 #         gaussian_blur: True
 #      config:
 #          memory_per_job: 3G
-#  - model_parameter_randomization:
-#      args:
-#          max_index: 300
-#          distance_measures:
-#            - cosine
-#            - ssim
-#            - spearman
-#            - spearman_abs
-#            - hog
-#          setting: independent   # top_down   bottom_up   independent
-#      config:
-#          memory_per_job: 15G  # 15G # 40G # 7G
-  - separability:
+  - model_parameter_randomization:
       args:
+          max_index: 300
+          distance_measures:
+            - cosine
+            - ssim
+            - spearman
+            - spearman_abs
+            - hog
+          setting: independent   # top_down   bottom_up   independent
       config:
-          memory_per_job: 5G
+          memory_per_job: 15G  # 15G # 40G # 7G
+#  - one_class_separability:
+#      args:
+#      config:
+#          memory_per_job: 5G
 #  - separability:
 #      args:
 #      config:
