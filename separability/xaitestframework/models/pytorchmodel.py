@@ -66,9 +66,8 @@ def get_zennit_composite(xai_method, model, shape=None):
         composite_kwargs['canonizers'] = [VGGCanonizer()]
         # print("no canonizer")
     elif model.name == "resnet18":
-        # composite_kwargs['canonizers'] = [ResNetCanonizer()]
-        # composite_kwargs['canonizers'] = []
-        print("no canonizer")
+        composite_kwargs['canonizers'] = [ResNetCanonizer()]
+        # print("no canonizer")
     else:
         raise ValueError("Model name not known")
 
@@ -118,7 +117,7 @@ class PytorchModel(ModelInterface):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # HARD CODED
-        self.num_classes = 1000  # 1000     # 20  # 1000
+        self.num_classes = 20  # 1000     # 20  # 1000
 
         # init
         self.model = get_pytorch_model(modelname, self.num_classes)

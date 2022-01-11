@@ -10,7 +10,7 @@ filepath = "configs/config_experiments.yaml"
 
 dataname = "imagenet"
 dconfig = "imagenet"
-modelname = "vgg16bn"   # "resnet18"    vgg16bn
+modelname = "resnet18"   # "resnet18"    vgg16bn
 
 configuration = "{}_{}".format(modelname, dconfig)
 ref_configuration = "{}_{}_uncanonized".format(modelname, dconfig)

@@ -14,13 +14,17 @@ ns = {
 
 # parameters
 setting = "cascading_top_down"     # "cascading_top_down"      "independent"   cascading_bottom_up
-canonization = "canonized"
-template = "results/inkscape/mpr_{}_bn.svg".format(setting)
+canonization = "uncanonized"
+# template = "results/inkscape/mpr_{}_bn.svg".format(setting)
+template = "results/inkscape/mpr_{}_resnet.svg".format(setting)
 
-modelsetting = "vgg16bn_imagenet"
+# modelsetting = "vgg16bn_imagenet"
+modelsetting = "resnet18_imagenet"
 fname = "n01843383_4067"       # "n01843383_12472"     n01843383_10599     n01843383_4067  2008_000804
 
-layers = ["linear3", "linear2", "linear1", "conv13", "conv11", "conv8", "conv5", "conv3", "conv1"]
+# layers = ["linear3", "linear2", "linear1", "conv13", "conv11", "conv8", "conv5", "conv3", "conv1"]
+layers = ["linear1", "conv19", "conv16", "conv14", "conv11", "conv9", "conv6", "conv4", "conv1"]
+
 
 if setting != "cascading_top_down":
     layers = layers[::-1]

@@ -7,15 +7,15 @@ system_config:
   threads: 5
 
 data:
-  datapath: /data/cluster/users/motzkus/data/imagenet/    # /data/cluster/users/motzkus/data/VOC2012/     imagenet
-  dataname: imagenet  # VOC2012    imagenet
-  datasetobject: MyImagenetDataset   # VOC2012Dataset   MyImagenetDataset
+  datapath: /data/cluster/users/motzkus/data/VOC2012/    # /data/cluster/users/motzkus/data/VOC2012/     imagenet
+  dataname: VOC2012  # VOC2012    imagenet
+  datasetobject: VOC2012Dataset   # VOC2012Dataset   MyImagenetDataset
   partition: val  # might delete to enable simultaneous computation on train/val dataset
   batchsize: 50
 
 model:
-  modelpath: /data/cluster/users/motzkus/models/vgg16bn_imagenet/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
-  modelname: vgg16bn     #vgg16      # resnet18    #vgg16bn
+  modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
+  modelname: vgg16     #vgg16      # resnet18    #vgg16bn
   modeltype: pytorch
 
 dirs:
@@ -25,7 +25,7 @@ dirs:
   outputdir: /data/cluster/users/motzkus/results
 
 layers:
-#  - conv1
+  - conv1
 #  - conv3
 #  - conv5
 #  - conv8
@@ -41,15 +41,15 @@ layers:
 #  - block5_conv1
 #  - fc1
 #  - fc2
-  - conv1     # input
-  - conv4     # sec1.1
-  - conv6     # sec2
-  - conv9     # sec2.1
-  - conv11    # sec3
-  - conv14    # sec3.1
-  - conv16    # sec4
-  - conv19    # sec4.1
-  - linear1
+#  - conv1     # input
+#  - conv4     # sec1.1
+#  - conv6     # sec2
+#  - conv9     # sec2.1
+#  - conv11    # sec3
+#  - conv14    # sec3.1
+#  - conv16    # sec4
+#  - conv19    # sec4.1
+#  - linear1
 
 xai_methods:
 #  - LRPZ
@@ -58,22 +58,23 @@ xai_methods:
 #  - LRPSequentialCompositeBFlat
 #  - LRPGamma
 #  - Gradient
-#  - random
-#  - Saliency
+  - random
+  - Saliency
 #  - SmoothGrad
-#  - Deconvolution
+  - Deconvolution
 #  - IntegratedGradients
 #  - GradientXActivation
 #  - GradCam
 #  - DeepLift
   - epsilon
-  - epsilon_gamma_box
+#  - epsilon_gamma_box
   - epsilon_plus
 #  - epsilon_plus_flat
   - epsilon_alpha2_beta1
 #  - epsilon_alpha2_beta1_flat
   - alpha2_beta1
 #  - alpha2_beta1_flat
+#  - epsilon_gamma
 
 classes:
   - all
@@ -118,7 +119,7 @@ quantifications:
 #            - 0.7
 #            - 0.8
 #            - 0.9
-#          distribution: inpaint_ns   # uniform, gaussian, inpaint_telea, inpaint_ns, uniform_region, gaussian_region
+#          distribution: gaussian   # uniform, gaussian, inpaint_telea, inpaint_ns, uniform_region, gaussian_region
 #      config:
 #          memory_per_job: 5G
 #  - pointing_game:

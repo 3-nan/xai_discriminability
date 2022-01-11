@@ -28,13 +28,18 @@ dataloader = DataLoader(dataset, batch_size=5, shuffle=False, startidx=0, endidx
 print("Data loaded.")
 
 # init model
-model_path = "../models/pytorch/vgg16bn_imagenet/model.pt"
-model_name = "vgg16bn"
+# model_path = "../models/pytorch/vgg16bn_imagenet/model.pt"
+# model_name = "vgg16bn"
+model_path = "../models/pytorch/resnet18_imagenet/model.pt"
+model_name = "resnet18"
 model = PytorchModel(model_path, model_name)
 print("Model loaded.")
 
 # parameters
-result_dir = "../results/vgg16bn_imagenet/mpr_example"
+result_dir = "../results/{}_imagenet/mpr_example".format(model_name)
+
+os.makedirs(result_dir, exist_ok=True)
+
 xai_methods = ["epsilon", "alpha2_beta1", "alpha2_beta1_flat",
                "epsilon_plus", "epsilon_plus_flat", "epsilon_gamma_box", "epsilon_alpha2_beta1",
                "epsilon_alpha2_beta1_flat"]
@@ -42,13 +47,15 @@ xai_methods = ["epsilon", "alpha2_beta1", "alpha2_beta1_flat",
 setting = "cascading_top_down"    # cascading_top_down  independent     cascading_bottom_up
 distance = "spearman_distance"
 input_layer = "conv1"
-canonization = "canonized"
+canonization = "uncanonized"
 
 # get layers including weights and iterate them
 layer_names = model.get_layer_names(with_weights_only=True)
 
 if setting == "cascading_top_down":
     layer_names = layer_names[::-1]
+
+os.makedirs(os.path.join(result_dir, setting), exist_ok=True)
 
 # compute original explanations
 for b, batch in enumerate(dataloader):

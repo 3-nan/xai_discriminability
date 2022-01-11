@@ -26,14 +26,16 @@ def submit_on_sungrid(args, configs, jobconfig, quantification_method, index, wi
 
     if with_attr:
         xai_method, layer, classidx = with_attr
-        if classidx:
-            execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer, classidx)]
-        else:
-            execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer)]
 
-        execthis += ['cp /data/cluster/users/motzkus/data_$JOB_ID.tar.gz /data/local/users/motzkus/$JOB_ID/']
-        execthis += ['tar -xf /data/local/users/motzkus/$JOB_ID/data_$JOB_ID.tar.gz -C /data/local/users/motzkus/$JOB_ID/']
-        execthis += ['rm /data/cluster/users/motzkus/data_$JOB_ID.tar.gz']
+        if xai_method != "random":
+            if classidx:
+                execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer, classidx)]
+            else:
+                execthis += ['tar -zcf /data/cluster/users/motzkus/data_$JOB_ID.tar.gz -C /data/cluster/users/motzkus/results/ {}_{}/{}/{}'.format(configs["data"]["dataname"], configs["model"]["modelname"], xai_method, layer)]
+
+            execthis += ['cp /data/cluster/users/motzkus/data_$JOB_ID.tar.gz /data/local/users/motzkus/$JOB_ID/']
+            execthis += ['tar -xf /data/local/users/motzkus/$JOB_ID/data_$JOB_ID.tar.gz -C /data/local/users/motzkus/$JOB_ID/']
+            execthis += ['rm /data/cluster/users/motzkus/data_$JOB_ID.tar.gz']
 
     execthis += ['mkdir /data/local/users/motzkus/$JOB_ID/results']
     execthis += ['source /home/fe/motzkus/.bashrc']  # enables conda for bash ToDo: change dir

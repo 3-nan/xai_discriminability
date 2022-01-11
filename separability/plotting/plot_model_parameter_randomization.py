@@ -15,7 +15,7 @@ modelname = "resnet18"   # "resnet18"    vgg16bn
 configuration = "{}_{}".format(modelname, dconfig)
 ref_configuration = "{}_{}_uncanonized".format(modelname, dconfig)
 
-option = "cascading_top_down"      # "cascading_top_down"  "independent" "cascading_bottom_up"
+option = "independent"      # "cascading_top_down"  "independent" "cascading_bottom_up"
 
 if dataname == "VOC2012":
     classindices = range(20)
@@ -118,6 +118,7 @@ with open(filepath) as file:
 
             plt.plot(csv["layer"], mean_scores)
 
+        plt.axhline(y=0.0, color='black', linestyle='-', linewidth=2., zorder=0.01)
         plt.ylabel("Diff. to uncanonized baseline")
         plt.xticks(rotation="45", ha="right")
         # plt.ylim(-0.1, 1.1)

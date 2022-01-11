@@ -33,7 +33,9 @@ with open(filepath) as file:
         # classindices = ["2", "4", "6"]
         classindices = ["3", "8", "12"]
 
-        percentages = [0.0, 0.0002, 0.0004, 0.0006, 0.0008, 0.002, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]
+        # percentages = [0.0, 0.0002, 0.0004, 0.0006, 0.0008, 0.002, 0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]
+
+        percentages = [0.0, 0.02, 0.2, 0.5, 0.9]
 
         # plt.figure()
         # plt.scatter(train_embedding[:, 0], train_embedding[:, 1], s=3., c=targets, cmap="Set1")

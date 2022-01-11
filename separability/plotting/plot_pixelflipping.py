@@ -11,13 +11,13 @@ import seaborn as sns
 
 filepath = "configs/config_experiments.yaml"
 
-dataname = "imagenet"
-modelname = "resnet18"      # "vgg16bn"
+dataname = "VOC2012"       # VOC2012   imagenet
+modelname = "vgg16"      # "vgg16bn"     vgg16   resnet18
 
-configuration = "resnet18_imagenet"     # "vgg16bn_imagenet"
+configuration = None   # "vgg16bn_imagenet"    resnet18_imagenet
 ref_configuration = "resnet18_imagenet_uncanonized"         # "vgg16bn_imagenet_uncanonized"
 
-distribution = "uniform"     # "uniform" "inpaint_ns"
+distribution = "inpaint_telea"     # "uniform" "inpaint_ns"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
@@ -77,13 +77,15 @@ with open(filepath) as file:
                 csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + str(classidx) + ".csv")
             except FileNotFoundError:
                 csv = pd.read_csv(resultdir + "_" + xai_method + "_" + distribution + "_" + str(classidx) + ".csv")
-                ref_csv = pd.read_csv("{}_{}_{}_{}.csv".format(ref_resultdir, xai_method, distribution, str(classidx)))
+                if configuration:
+                    ref_csv = pd.read_csv("{}_{}_{}_{}.csv".format(ref_resultdir, xai_method, distribution, str(classidx)))
             # print(float(csv["separability_score"]))
             # print(csv)
             percentages = csv["flip_percentage"]
             scores = csv["flipped_score"]
 
-            scores = scores - ref_csv["flipped_score"]
+            if configuration:
+                scores = scores - ref_csv["flipped_score"]
 
             method_scores.append(scores)
 
@@ -100,10 +102,14 @@ with open(filepath) as file:
     plt.axhline(y=0.0, color='black', linestyle='-', linewidth=1., zorder=0.01)
     plt.xlabel("Ratio of flipped pixels")
     # plt.ylabel("Score in relation to Saliency")
-    plt.ylabel("Diff. in the Pixelflipping Score")
-    # plt.ylim(0.0, 0.7)
+
+    if configuration:
+        plt.ylabel("Diff. in the Pixelflipping Score")
+    else:
+        plt.ylabel("Pixelflipping Score")
+    plt.ylim(0.0, 0.7)
     # plt.ylim(0.55, 1.0)
-    plt.ylim(-0.22, 0.105)
+    # plt.ylim(-0.22, 0.105)
 
     if log_scale:
         plt.xscale("log")
@@ -116,7 +122,7 @@ with open(filepath) as file:
     if configuration:
         plt.savefig("../results/figures/{}/pixelflipping/ref_pixelflipping_{}.svg".format(configuration, distribution), format="svg")
     else:
-        plt.savefig("../results/figures/pixelflipping/pixelflipping_{}_lrp_relation.svg".format(distribution), format="svg")
+        plt.savefig("../results/figures/pixelflipping/pixelflipping_{}_start2.svg".format(distribution), format="svg")
 
 
 # with open(filepath) as file:

@@ -12,26 +12,28 @@ ns = {
     "sodipodi": "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
 }
 
-multi_class = False
+multi_class = True
 
 
 if multi_class == True:
     # parameters
-    template = "results/inkscape/pixelflipping_tsne.svg"
+    template = "results/inkscape/pixelflipping_tsne_new.svg"
 
     tree = ET.parse(template)
     print(tree)
     print(list(tree.iter()))
 
-    layer = "linear2"
+    layer = "conv13"           # conv13    linear2
     distributions = ["uniform", "gaussian", "inpaint_telea", "inpaint_ns"]
 
     for distribution in distributions:
 
         classindices = [3, 8, 12]
-        percentages = [0.0, 0.0002, 0.002, 0.02, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]
+        # percentages = [0.0, 0.0002, 0.002, 0.02, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9]
 
-        output_path = "results/figures/tsne_manifold/tsne_{}_{}.svg".format(layer, distribution)
+        percentages = [0.0, 0.02, 0.2, 0.5, 0.9]
+
+        output_path = "results/figures/tsne_manifold/tsne_{}_{}_new.svg".format(layer, distribution)
 
         for p, percentage in enumerate(percentages):
             for i, idx in enumerate(classindices):
