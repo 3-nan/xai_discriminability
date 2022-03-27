@@ -5,20 +5,32 @@ import matplotlib.pyplot as plt
 
 # from ..xaitestframework.helpers.universal_helper import join_path
 
+LABEL_DICT = {
+    "epsilon": r'LRP-$\varepsilon$',
+    "epsilon_plus": r'LRP-$\varepsilon$-+',
+    "epsilon_plus_flat": r'LRP-$\varepsilon$-+-$\flat$',
+    "epsilon_alpha2_beta1": r'LRP-$\varepsilon$-$\alpha$2$\beta$1',
+    "epsilon_alpha2_beta1_flat": r'LRP-$\varepsilon$-$\alpha$2$\beta$1-$\flat$',
+    "guided_backprop": "GBP",
+    "excitation_backprop": "EBP",
+    "Gradient": "Gradient",
+    "IntegratedGradients": "IG",
+}
+
 filepath = "configs/config_experiments.yaml"
 
 dataname = "imagenet"
-modelname = "resnet18"          # "vgg16bn"
+modelname = "vgg16bn"          # "vgg16bn" resnet18
 
-data = "{}_{}".format(modelname, dataname)
-ref_data = "{}_{}_uncanonized".format(modelname, dataname)
+data = "{}_{}".format(dataname, modelname)
+ref_data = "{}_{}_noncanonized".format(dataname, modelname)
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
     if data:
-        resultdir = "../results/{}/attribution_localization/{}_{}".format(data, dataname, modelname)
-        ref_resultdir = "../results/{}/attribution_localization/{}_{}".format(ref_data, dataname, modelname)
+        resultdir = "../results/canonization/{}/attribution_localization/{}_{}".format(data, dataname, modelname)
+        ref_resultdir = "../results/canonization/{}/attribution_localization/{}_{}".format(ref_data, dataname, modelname)
 
     if dataname == "VOC2012":
         classindices = range(20)
@@ -58,7 +70,7 @@ with open(filepath) as file:
 
     cmap = plt.cm.get_cmap("Paired", 12)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 4))
 
     ind = np.arange(len(xai_methods))
 
@@ -72,16 +84,17 @@ with open(filepath) as file:
     # ax.bar(ind + 0.5, scores_u25, 0.25, tick_label=xai_methods, color=cmap(6))
     # ax.bar(ind + 0.5, ref_u25, 0.125, tick_label=xai_methods, color=cmap(7))
 
-    plt.xticks(ind, labels=xai_methods, rotation="25", ha="right")
-    plt.ylim([0.0, 1.0])
+    plt.xticks(ind, labels=[LABEL_DICT[x] for x in xai_methods], rotation="25", ha="right")
+    plt.ylim([0.0, 0.8])
     plt.xlabel("XAI method")
-    plt.ylabel("Scores")
-    plt.title("Attribution Localization (class-wise mean)")
+    plt.ylabel("Inside-Total Ratio")    # Scores
+    # plt.title("Attribution Localization (Class-wise Mean)")
     plt.legend(handles=[c1, u1, c2, u2, c3, u3],
-               labels=["", "", "", "", "canonized", "uncanonized"],
+               labels=["", "", "", "", "canonized", "non-canonized"],
                ncol=3, handletextpad=0.5, handlelength=1.0, columnspacing=-0.5)
     plt.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.savefig("../results/canonization/{}_{}_attribution_localization.svg".format(dataname, modelname))
 
     d = {"xai_method": xai_methods,
          "total_scores": total_scores,
@@ -90,4 +103,4 @@ with open(filepath) as file:
          "scores_u25": scores_u25
          }
     df = pd.DataFrame(data=d)
-    df.to_csv("../results/{}/attribution_localization_results.csv".format(data), index=False)
+    df.to_csv("../results/canonization/{}/attribution_localization_results.csv".format(data), index=False)

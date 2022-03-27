@@ -7,15 +7,15 @@ system_config:
   threads: 5
 
 data:
-  datapath: /data/cluster/users/motzkus/data/VOC2012/    # /data/cluster/users/motzkus/data/VOC2012/     imagenet
-  dataname: VOC2012  # VOC2012    imagenet
-  datasetobject: VOC2012Dataset   # VOC2012Dataset   MyImagenetDataset
+  datapath: /data/cluster/users/motzkus/data/imagenet/    # /data/cluster/users/motzkus/data/VOC2012/     imagenet
+  dataname: imagenet  # VOC2012    imagenet
+  datasetobject: MyImagenetDataset   # VOC2012Dataset   MyImagenetDataset
   partition: val  # might delete to enable simultaneous computation on train/val dataset
   batchsize: 50
 
 model:
-  modelpath: /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
-  modelname: vgg16     #vgg16      # resnet18    #vgg16bn
+  modelpath: /data/cluster/users/motzkus/models/densenet121_imagenet/pytorch_model/model.pt # /data/cluster/users/motzkus/models/resnet18_voc2012/pytorch_model/model.pt  #  /data/cluster/users/motzkus/models/vgg16_voc2012/pytorch_model/model.pt
+  modelname: densenet121     #vgg16      # resnet18    #vgg16bn
   modeltype: pytorch
 
 dirs:
@@ -58,10 +58,10 @@ xai_methods:
 #  - LRPSequentialCompositeBFlat
 #  - LRPGamma
 #  - Gradient
-  - random
-  - Saliency
+#  - random
+#  - Saliency
 #  - SmoothGrad
-  - Deconvolution
+#  - Deconvolution
 #  - IntegratedGradients
 #  - GradientXActivation
 #  - GradCam
@@ -69,12 +69,16 @@ xai_methods:
   - epsilon
 #  - epsilon_gamma_box
   - epsilon_plus
-#  - epsilon_plus_flat
+  - epsilon_plus_flat
   - epsilon_alpha2_beta1
-#  - epsilon_alpha2_beta1_flat
-  - alpha2_beta1
+  - epsilon_alpha2_beta1_flat
+#  - alpha2_beta1
 #  - alpha2_beta1_flat
 #  - epsilon_gamma
+  - excitation_backprop
+  - guided_backprop
+  - Gradient
+  - IntegratedGradients
 
 classes:
   - all
@@ -90,12 +94,12 @@ classes:
 #  - tvmonitor
 
 quantifications:
-#  - attribution_computation:
-#      config:
-#          memory_per_job: 10G # 10G  # 20
+  - attribution_computation:
+      config:
+          memory_per_job: 6G # 10G  # 20
 #  - attribution_localization:
 #      config:
-#          memory_per_job: 3G
+#          memory_per_job: 4G
 #  - pixelflipping:
 #      args:
 #          percentages:
@@ -119,7 +123,7 @@ quantifications:
 #            - 0.7
 #            - 0.8
 #            - 0.9
-#          distribution: gaussian   # uniform, gaussian, inpaint_telea, inpaint_ns, uniform_region, gaussian_region
+#          distribution: uniform   # uniform, gaussian, inpaint_telea, inpaint_ns, uniform_region, gaussian_region
 #      config:
 #          memory_per_job: 5G
 #  - pointing_game:
@@ -127,18 +131,18 @@ quantifications:
 #         gaussian_blur: True
 #      config:
 #          memory_per_job: 3G
-  - model_parameter_randomization:
-      args:
-          max_index: 300
-          distance_measures:
-            - cosine
-            - ssim
-            - spearman
-            - spearman_abs
-            - hog
-          setting: independent   # top_down   bottom_up   independent
-      config:
-          memory_per_job: 15G  # 15G # 40G # 7G
+#  - model_parameter_randomization:
+#      args:
+#          max_index: 300
+#          distance_measures:
+#            - cosine
+#            - ssim
+#            - spearman
+#            - spearman_abs
+#            - hog
+#          setting: independent   # top_down   bottom_up   independent
+#      config:
+#          memory_per_job: 15G  # 15G # 40G # 7G
 #  - one_class_separability:
 #      args:
 #      config:

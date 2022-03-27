@@ -2,16 +2,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models
+import zennit.attribution
 from captum.attr import (Deconvolution, GradientAttribution, NoiseTunnel, IntegratedGradients, Lime, Saliency,
                          LayerGradientXActivation,
                          LayerGradCam,
                          LayerDeepLift,
                          LayerIntegratedGradients)
-from zennit.torchvision import VGGCanonizer, ResNetCanonizer
+from zennit.torchvision import VGGCanonizer, ResNetCanonizer, SequentialMergeBatchNorm
+from zennit.canonizers import NamedMergeBatchNorm
 from zennit.rules import *
 from zennit.composites import *
 
 from ..explainers.composites import *
+from ..explainers.canonizers import *
 # from ..explainers.zennit.torchvision import VGGCanonizer
 # from ..explainers.zennit.composites import COMPOSITES, LAYER_MAP_BASE, LayerMapComposite
 # from ..explainers.zennit.rules import *
@@ -31,9 +34,14 @@ CAPTUM_DICT = {
     "GradientXActivation": LayerGradientXActivation,
     "GradCam": LayerGradCam,
     "DeepLift": LayerDeepLift,
-    "IntegratedGradients": LayerIntegratedGradients,
+    # "IntegratedGradients": LayerIntegratedGradients,
 }
 
+ZENNIT_GRADIENT = {
+    "Gradient": LayerMapComposite,
+    "IntegratedGradients": LayerMapComposite,
+    "GradientxInput": LayerMapComposite,
+}
 # ZENNIT_DICT = {
 #     "epsilon": LayerMapComposite(layer_map=LAYER_MAP_BASE + [(nn.Module, Epsilon())])
 # }
@@ -68,14 +76,46 @@ def get_zennit_composite(xai_method, model, shape=None):
     elif model.name == "resnet18":
         composite_kwargs['canonizers'] = [ResNetCanonizer()]
         # print("no canonizer")
+    elif model.name == "densenet121":
+        # composite_kwargs['canonizers'] = [NamedMergeBatchNorm([
+        #     [('features.conv0',), 'features.norm0'],
+        #     [["features.denseblock1.denselayer1.conv1"], "features.denseblock1.denselayer1.norm2"],
+        #     # [["features.denseblock1.denselayer1.conv2"], "features.denseblock1.denselayer2.norm1"]
+        #     [["features.denseblock1.denselayer2.conv1"], "features.denseblock1.denselayer2.norm2"],
+        #     # [["features.denseblock1.denselayer1.conv2", "features.denseblock1.denselayer2.conv2"], "features.denseblock1.denselayer3.norm1"],
+        #     [["features.denseblock1.denselayer3.conv1"], "features.denseblock1.denselayer3.norm2"],
+        #     [["features.denseblock1.denselayer4.conv1"], "features.denseblock1.denselayer4.norm2"],
+        #     [["features.denseblock1.denselayer5.conv1"], "features.denseblock1.denselayer5.norm2"],
+        #     [["features.denseblock1.denselayer6.conv1"], 'features.denseblock1.denselayer6.norm2'],
+        # ])]
+        canonizers = [NamedMergeBatchNorm([(('features.conv0',), 'features.norm0')])]
+        #
+        # layer_conv = [6, 12, 24, 16]
+        #
+        # for block, block_length in enumerate(layer_conv):
+        #     for layer in range(block_length):
+        #         for item in [1, 2]:
+        #             canonizers.append(
+        #                 NamedMergeDense([(
+        #                     ('features.denseblock{}.denselayer{}.norm{}'.format(block+1, layer+1, item)),
+        #                     ('features.denseblock{}.denselayer{}.relu{}'.format(block+1, layer+1, item)),
+        #                     ('features.denseblock{}.denselayer{}.conv{}'.format(block+1, layer+1, item))
+        #                 )])
+        #             )
+        # canonizers.append(NamedMergeBatchNorm([(('classifier',), 'features.norm5')]))
+        # composite_kwargs['canonizers'] = [CompositeCanonizer(canonizers)]
+        # print("no canonizer")
     else:
         raise ValueError("Model name not known")
 
     # create a composite specified by a name; the COMPOSITES dict includes all preset composites
     # provided by zennit.
-    composite = COMPOSITES[xai_method]
-
-    composite = composite(**composite_kwargs)
+    if xai_method in ZENNIT_GRADIENT.keys():
+        composite = ZENNIT_GRADIENT[xai_method]
+        composite = composite({}, **composite_kwargs)
+    else:
+        composite = COMPOSITES[xai_method]
+        composite = composite(**composite_kwargs)
 
     return composite
 
@@ -92,6 +132,7 @@ def get_pytorch_model(modelname, num_classes):
         "vgg16": models.vgg16,
         "vgg16bn": models.vgg16_bn,
         "resnet18": models.resnet18,
+        "densenet121": models.densenet121,
         "densenet161": models.densenet161,
         "inception": models.inception_v3
     }
@@ -103,6 +144,8 @@ def get_pytorch_model(modelname, num_classes):
         model.classifier[-1] = nn.Linear(4096, num_classes)      # TODO change num_classes
     elif modelname == "resnet18":
         model.fc = nn.Linear(512, num_classes)
+    elif modelname == "densenet121":
+        print("continue at get pytorch model")
     else:
         raise ValueError("please specify get pytorch model")
 
@@ -117,7 +160,7 @@ class PytorchModel(ModelInterface):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # HARD CODED
-        self.num_classes = 20  # 1000     # 20  # 1000
+        self.num_classes = 1000  # 1000     # 20  # 1000
 
         # init
         self.model = get_pytorch_model(modelname, self.num_classes)
@@ -236,6 +279,7 @@ class PytorchModel(ModelInterface):
                     r_batch = ana.attribute(batch_tensor, target=neuron_selection)    # baseline
                 # explained_layer_names=layer_names)
                 r_batch_dict = {layer_names[0]: r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()}
+
             else:
                 r_batch_dict = {}
 
@@ -252,8 +296,34 @@ class PytorchModel(ModelInterface):
                         r_batch_dict[layer_name] = r_batch.detach().permute(0, 2, 3, 1).cpu().numpy()
                     else:
                         r_batch_dict[layer_name] = r_batch.detach().cpu().numpy()
-        else:
 
+        elif xai_method in ZENNIT_GRADIENT.keys():
+            r_batch_dict = {}
+
+            # Zennit attribution computation
+            batch_tensor = torch.as_tensor(batch, device=self.device).permute(0, 3, 1, 2)
+            eye = torch.eye(self.num_classes, device=self.device)
+            targets = np.ones(len(batch)) * neuron_selection
+
+            composite = get_zennit_composite(xai_method, self, shape=list(batch_tensor.size()))
+
+            if xai_method == "Gradient" or xai_method == "GradientxInput":
+                attributor = zennit.attribution.Gradient(model=self.model, composite=composite)
+            elif xai_method == "IntegratedGradients":
+                attributor = zennit.attribution.IntegratedGradients(model=self.model, composite=composite,
+                                                                    **{'n_iter': 10})
+            else:
+                print("No Zennit strategy for handling {} is implemented".format(xai_method))
+
+            with attributor:
+                output, relevance = attributor(batch_tensor, eye[targets])
+
+                if xai_method == "GradientxInput":
+                    r = relevance.detach().permute(0, 2, 3, 1).cpu().numpy()
+                    r_batch_dict[layer_names[0]] = r * batch
+                else:
+                    r_batch_dict[layer_names[0]] = relevance.detach().permute(0, 2, 3, 1).cpu().numpy()
+        else:
             # get handles for chosen layers
             handles = [layer.register_forward_pre_hook(hook) for layer in layers]
 

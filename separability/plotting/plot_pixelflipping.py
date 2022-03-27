@@ -9,22 +9,38 @@ import seaborn as sns
 # sns.set_theme(style="darkgrid")
 # sns.set_palette(sns.color_palette("hls", 20))
 
+# plt.rcParams.update({'font.size': 13})
+
+LABEL_DICT = {
+    "epsilon": r'LRP-$\varepsilon$',
+    "epsilon_plus": r'LRP-$\varepsilon$-+',
+    "epsilon_plus_flat": r'LRP-$\varepsilon$-+-$\flat$',
+    "epsilon_alpha2_beta1": r'LRP-$\varepsilon$-$\alpha$2$\beta$1',
+    "epsilon_alpha2_beta1_flat": r'LRP-$\varepsilon$-$\alpha$2$\beta$1-$\flat$',
+    "guided_backprop": "GBP",
+    "excitation_backprop": "EBP",
+    "Gradient": "Gradient",
+    "IntegratedGradients": "IG",
+}
+
 filepath = "configs/config_experiments.yaml"
 
-dataname = "VOC2012"       # VOC2012   imagenet
-modelname = "vgg16"      # "vgg16bn"     vgg16   resnet18
+dataname = "imagenet"       # VOC2012   imagenet
+modelname = "resnet18"      # "vgg16bn"     vgg16   resnet18
 
-configuration = None   # "vgg16bn_imagenet"    resnet18_imagenet
-ref_configuration = "resnet18_imagenet_uncanonized"         # "vgg16bn_imagenet_uncanonized"
+# configuration = "imagenet_resnet18"   # "vgg16bn_imagenet"    resnet18_imagenet
+# ref_configuration = "imagenet_resnet18_noncanonized"         # "vgg16bn_imagenet_uncanonized"
+configuration = "imagenet_{}".format(modelname)
+ref_configuration = "imagenet_{}_noncanonized".format(modelname)
 
-distribution = "inpaint_telea"     # "uniform" "inpaint_ns"
+distribution = "uniform"     # "uniform" "inpaint_ns"
 
 with open(filepath) as file:
     configs = yaml.load(file, Loader=yaml.FullLoader)
 
     if configuration:
-        resultdir = "../results/{}/pixelflipping/{}_{}".format(configuration, dataname, modelname)
-        ref_resultdir = "../results/{}/pixelflipping/{}_{}".format(ref_configuration, dataname, modelname)
+        resultdir = "../results/canonization/{}/pixelflipping/{}_{}".format(configuration, dataname, modelname)
+        ref_resultdir = "../results/canonization/{}/pixelflipping/{}_{}".format(ref_configuration, dataname, modelname)
     else:
         resultdir = "../results/pixelflipping/{}_{}".format(dataname, modelname)
 
@@ -64,7 +80,7 @@ with open(filepath) as file:
     #     plt.show()
 
     # build mean over classes
-    plt.figure()
+    plt.figure(figsize=(4,4))
 
     ground_scores = []
 
@@ -100,29 +116,31 @@ with open(filepath) as file:
         plt.plot(percentages, method_scores)
 
     plt.axhline(y=0.0, color='black', linestyle='-', linewidth=1., zorder=0.01)
-    plt.xlabel("Ratio of flipped pixels")
+    plt.xlabel("Ratio of perturbed pixels")
     # plt.ylabel("Score in relation to Saliency")
 
     if configuration:
-        plt.ylabel("Diff. in the Pixelflipping Score")
+        plt.ylabel("Diff. in the Input Perturbation Score")
     else:
         plt.ylabel("Pixelflipping Score")
-    plt.ylim(0.0, 0.7)
+    # plt.ylim(0.0, 0.7)
     # plt.ylim(0.55, 1.0)
-    # plt.ylim(-0.22, 0.105)
+    plt.ylim(-0.135, 0.05)
+    plt.grid()
 
     if log_scale:
         plt.xscale("log")
 
-    plt.title("Pixelflipping (class-wise mean) with {} replacement".format(distribution))
-    plt.legend(configs["xai_methods"])
+    # plt.title("Pixelflipping (class-wise mean) with {} replacement".format(distribution))
+    plt.legend([LABEL_DICT[x] for x in configs["xai_methods"]])
 
     # plt.show()
+    plt.tight_layout()
 
     if configuration:
-        plt.savefig("../results/figures/{}/pixelflipping/ref_pixelflipping_{}.svg".format(configuration, distribution), format="svg")
+        plt.savefig("../results/canonization/{}_ref_pixelflipping_{}.svg".format(configuration, distribution), format="svg")
     else:
-        plt.savefig("../results/figures/pixelflipping/pixelflipping_{}_start2.svg".format(distribution), format="svg")
+        plt.savefig("../results/figures/canonization/pixelflipping/pixelflipping_{}_start2.svg".format(distribution), format="svg")
 
 
 # with open(filepath) as file:
